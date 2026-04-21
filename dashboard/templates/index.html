@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Diagnostic Canvas AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Public+Sans:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand-lockup">
+          <div>
+            <h1>Diagnostic Canvas AI</h1>
+            <p>Analisis inteligente de radiografias</p>
+          </div>
+        </div>
+
+        <nav class="topnav">
+          <a class="is-active" href="#workspace">Dashboard</a>
+          <a href="#patient-records">Patient Records</a>
+          <a href="#analytics">Analytics</a>
+          <a href="#radiografias">Radiografias</a>
+        </nav>
+
+        <div class="top-actions">
+          <button class="icon-button" type="button" aria-label="Notificaciones">
+            <span class="material-symbols-outlined">notifications</span>
+          </button>
+          <div class="avatar">DR</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="hospital-card">
+          <div class="hospital-mark">
+            <span class="material-symbols-outlined">local_hospital</span>
+          </div>
+          <div>
+            <strong>St. Jude Medical</strong>
+            <p>Radiology Dept.</p>
+          </div>
+        </div>
+
+        <nav class="side-nav">
+          <a class="side-link side-link-primary" href="#workspace">
+            <span class="material-symbols-outlined">add_box</span>
+            <span>New Analysis</span>
+          </a>
+          <a class="side-link" id="patient-records" href="#file-status">
+            <span class="material-symbols-outlined">history</span>
+            <span>Patient History</span>
+          </a>
+          <a class="side-link" href="#viewer-card">
+            <span class="material-symbols-outlined">biotech</span>
+            <span>Diagnostic Tools</span>
+          </a>
+          <a class="side-link" href="#results">
+            <span class="material-symbols-outlined">verified</span>
+            <span>Quality Control</span>
+          </a>
+          <a class="side-link" href="#analytics">
+            <span class="material-symbols-outlined">monitoring</span>
+            <span>Analytics</span>
+          </a>
+          <a class="side-link" href="#radiografias">
+            <span class="material-symbols-outlined">imagesmode</span>
+            <span>Radiografias</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <a class="side-link" href="#support">
+            <span class="material-symbols-outlined">contact_support</span>
+            <span>Support</span>
+          </a>
+          <a class="side-link" href="#footer">
+            <span class="material-symbols-outlined">logout</span>
+            <span>Log Out</span>
+          </a>
+        </div>
+      </aside>
+
+      <main class="main-canvas" id="workspace">
+        <section class="hero-copy">
+          <h2>Hospital AI System</h2>
+          <p>
+            Bienvenido al centro de diagnostico avanzado. Suba una radiografia de torax
+            para iniciar el analisis automatico mediante redes neuronales profundas.
+          </p>
+        </section>
+
+        <div class="workspace-grid">
+          <section class="upload-column">
+            {% if error %}
+            <div class="alert alert-error">{{ error }}</div>
+            {% endif %}
+
+            {% if success %}
+            <div class="alert alert-success">{{ success }}</div>
+            {% endif %}
+
+            <form class="analysis-form" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+              <input
+                id="file-input"
+                class="visually-hidden"
+                name="file"
+                type="file"
+                accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                required
+              />
+
+              <label class="upload-dropzone" id="dropzone" for="file-input">
+                <span class="material-symbols-outlined upload-icon">cloud_upload</span>
+                <h3>Subir radiografia</h3>
+                <p>Arrastre y suelte el archivo JPG, JPEG o PNG aqui</p>
+                <span class="upload-button">Seleccionar Archivo</span>
+              </label>
+
+              <article class="file-card" id="file-status">
+                <div class="file-card-icon">
+                  <span class="material-symbols-outlined">description</span>
+                </div>
+                <div class="file-card-copy">
+                  <strong id="file-name-display">{{ uploaded_filename }}</strong>
+                  <p id="file-meta-display">{{ file_status }}</p>
+                </div>
+                <span class="material-symbols-outlined file-state-icon">
+                  {% if has_result %}check_circle{% elif has_image %}schedule{% else %}upload_file{% endif %}
+                </span>
+              </article>
+
+              <button class="analyze-button" type="submit">
+                <span class="material-symbols-outlined">analytics</span>
+                <span>Analizar radiografia</span>
+              </button>
+            </form>
+          </section>
+
+          <section class="viewer-card" id="viewer-card">
+            <div class="viewer-status">Vista previa - DICOM v3.0</div>
+
+            <div class="viewer-stage {% if not has_image %}is-empty{% endif %}">
+              {% if has_image %}
+              <img
+                id="viewer-image"
+                class="viewer-image"
+                src="{{ image_preview }}"
+                alt="Vista previa de la radiografia cargada"
+              />
+              {% else %}
+              <div class="viewer-placeholder" id="viewer-empty">
+                <span class="material-symbols-outlined">scan</span>
+                <p>La imagen diagnostica aparecera aqui cuando se cargue un estudio valido.</p>
+              </div>
+              <img
+                id="viewer-image"
+                class="viewer-image is-hidden"
+                src=""
+                alt="Vista previa de la radiografia cargada"
+              />
+              {% endif %}
+            </div>
+
+            <div class="viewer-controls medical-glass">
+              <button class="icon-button viewer-tool" type="button" data-viewer-action="zoom-in" aria-label="Acercar">
+                <span class="material-symbols-outlined">zoom_in</span>
+              </button>
+              <button class="icon-button viewer-tool" type="button" data-viewer-action="zoom-out" aria-label="Alejar">
+                <span class="material-symbols-outlined">zoom_out</span>
+              </button>
+              <button class="icon-button viewer-tool" type="button" data-viewer-action="contrast" aria-label="Contraste">
+                <span class="material-symbols-outlined">contrast</span>
+              </button>
+              <button class="icon-button viewer-tool" type="button" data-viewer-action="reset" aria-label="Reset">
+                <span class="material-symbols-outlined">center_focus_strong</span>
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <section class="results-grid" id="results">
+          <article class="diagnosis-card diagnosis-{{ result.state }}">
+            <div class="diagnosis-head">
+              <div>
+                <span class="card-kicker">{{ result.eyebrow }}</span>
+                <h3>{{ result.title }}</h3>
+              </div>
+              <span class="material-symbols-outlined diagnosis-icon">{{ result.icon }}</span>
+            </div>
+            <p class="diagnosis-copy">{{ result.description }}</p>
+
+            {% if object_key %}
+            <div class="storage-meta">
+              <span>MinIO bucket: {{ minio_bucket_name }}</span>
+              <code>{{ object_key }}</code>
+            </div>
+            {% endif %}
+          </article>
+
+          <article class="confidence-card" id="analytics">
+            <div class="confidence-head">
+              <h3>Puntajes de Confianza</h3>
+              <span class="confidence-chip">AI Confidence Alpha</span>
+            </div>
+
+            <div class="confidence-list">
+              {% for row in probability_rows %}
+              <div class="confidence-row">
+                <div class="confidence-meta">
+                  <span class="confidence-label confidence-{{ row.tone }}">{{ row.label }}</span>
+                  <strong>{{ "%.0f"|format(row.percent) }}%</strong>
+                </div>
+                <div class="confidence-track">
+                  <span
+                    class="confidence-fill confidence-fill-{{ row.tone }}"
+                    data-progress="{{ "%.2f"|format(row.percent) }}"
+                  ></span>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </article>
+        </section>
+
+        <section class="radiografias-grid" id="radiografias">
+          <article class="radiografias-card">
+            <span class="card-kicker">Radiografias</span>
+            <h3>Repositorio de imagenes en MinIO</h3>
+            <p>
+              Las radiografias subidas desde este panel se almacenan en MinIO y se
+              referencian desde PostgreSQL para mantener separados los datos estructurados
+              y los archivos clinicos.
+            </p>
+
+            <div class="radiografias-meta">
+              <div>
+                <span class="meta-label">Bucket</span>
+                <strong>{{ minio_bucket_name }}</strong>
+              </div>
+              <div>
+                <span class="meta-label">Endpoint interno</span>
+                <strong>{{ minio_endpoint }}</strong>
+              </div>
+            </div>
+
+            {% if object_key %}
+            <div class="radiografias-object">
+              <span class="meta-label">Ultimo objeto cargado</span>
+              <code>{{ object_key }}</code>
+            </div>
+            {% endif %}
+          </article>
+
+          <article class="radiografias-card radiografias-card-action">
+            <span class="card-kicker">Consola MinIO</span>
+            <h3>Abrir almacenamiento de radiografias</h3>
+            <p>
+              Acceda a la consola de MinIO para revisar buckets, objetos y validar que
+              las imagenes medicas se estan almacenando correctamente.
+            </p>
+
+            <a
+              class="minio-console-link"
+              href="{{ minio_console_url }}"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span class="material-symbols-outlined">open_in_new</span>
+              <span>{{ minio_console_url }}</span>
+            </a>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <footer class="footer" id="footer">
+      <div class="footer-inner">
+        <div class="footer-left">
+          <span>Sistema de soporte clinico basado en IA</span>
+          <p>(c) 2024 Clinical Precision AI. FDA Cleared for Diagnostic Assistance.</p>
+        </div>
+
+        <div class="footer-links">
+          <a href="#workspace">Clinical Disclaimer</a>
+          <a href="#analytics">Data Privacy</a>
+          <a href="#footer">Terms of Service</a>
+        </div>
+
+        <div class="footer-right" id="support">
+          <strong>No sustituye diagnostico medico</strong>
+          <p>Esta herramienta es para uso exclusivo de profesionales de la salud capacitados.</p>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      const fileInput = document.getElementById("file-input");
+      const dropzone = document.getElementById("dropzone");
+      const fileNameDisplay = document.getElementById("file-name-display");
+      const fileMetaDisplay = document.getElementById("file-meta-display");
+      const viewerImage = document.getElementById("viewer-image");
+      const viewerEmpty = document.getElementById("viewer-empty");
+      const progressBars = document.querySelectorAll(".confidence-fill");
+      const viewerButtons = document.querySelectorAll("[data-viewer-action]");
+
+      let viewerScale = 1;
+      let viewerContrastBoost = false;
+
+      function updateViewerTransform() {
+        if (!viewerImage || viewerImage.classList.contains("is-hidden")) {
+          return;
+        }
+
+        const contrast = viewerContrastBoost ? "contrast(1.3) brightness(1.05)" : "contrast(1) brightness(1)";
+        viewerImage.style.transform = `scale(${viewerScale})`;
+        viewerImage.style.filter = contrast;
+      }
+
+      function showPreview(file) {
+        if (!file) {
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          viewerImage.src = event.target.result;
+          viewerImage.classList.remove("is-hidden");
+          if (viewerEmpty) {
+            viewerEmpty.classList.add("is-hidden");
+          }
+          viewerScale = 1;
+          viewerContrastBoost = false;
+          updateViewerTransform();
+        };
+        reader.readAsDataURL(file);
+
+        const fileSize = (file.size / (1024 * 1024)).toFixed(1);
+        fileNameDisplay.textContent = file.name;
+        fileMetaDisplay.textContent = `${fileSize} MB - Listo para procesar`;
+      }
+
+      function applyDroppedFiles(files) {
+        if (!files || !files.length) {
+          return;
+        }
+
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        fileInput.files = dataTransfer.files;
+        showPreview(files[0]);
+      }
+
+      fileInput.addEventListener("change", (event) => {
+        const [file] = event.target.files;
+        showPreview(file);
+      });
+
+      dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropzone.classList.add("is-dragging");
+      });
+
+      dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("is-dragging");
+      });
+
+      dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("is-dragging");
+        applyDroppedFiles(event.dataTransfer.files);
+      });
+
+      viewerButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          if (!viewerImage || viewerImage.classList.contains("is-hidden")) {
+            return;
+          }
+
+          const action = button.dataset.viewerAction;
+          if (action === "zoom-in") {
+            viewerScale = Math.min(2.4, viewerScale + 0.15);
+          }
+          if (action === "zoom-out") {
+            viewerScale = Math.max(0.8, viewerScale - 0.15);
+          }
+          if (action === "contrast") {
+            viewerContrastBoost = !viewerContrastBoost;
+          }
+          if (action === "reset") {
+            viewerScale = 1;
+            viewerContrastBoost = false;
+          }
+
+          updateViewerTransform();
+        });
+      });
+
+      window.addEventListener("load", () => {
+        progressBars.forEach((bar) => {
+          const progress = bar.dataset.progress || "0";
+          requestAnimationFrame(() => {
+            bar.style.width = `${progress}%`;
+          });
+        });
+        updateViewerTransform();
+      });
+    </script>
+  </body>
+</html>
