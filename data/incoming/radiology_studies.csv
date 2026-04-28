@@ -1,0 +1,11 @@
+study_id,patient_age,patient_sex,image_object_key,label,acquisition_date,source
+XR-0001,34,F,uploads/sample_healthy_001.png,Sana,2026-04-01,simulated_lasalle
+XR-0002,71,M,uploads/sample_pneumonia_001.png,Neumonia,2026-04-02,simulated_lasalle
+XR-0003,58,F,uploads/sample_covid_001.png,COVID-19,2026-04-02,simulated_lasalle
+XR-0004,45,M,uploads/sample_covid_002.png,COVID-19,2026-04-03,simulated_lasalle
+XR-0005,62,F,uploads/sample_pneumonia_002.png,Neumonia,2026-04-03,simulated_lasalle
+XR-0006,29,F,uploads/sample_healthy_002.png,Sana,2026-04-04,simulated_lasalle
+XR-0007,53,M,uploads/sample_duplicate.png,Sana,2026-04-04,simulated_lasalle
+XR-0008,53,M,uploads/sample_duplicate.png,Neumonia,2026-04-04,simulated_lasalle
+XR-0009,40,F,,Sana,2026-04-05,simulated_lasalle
+XR-0010,68,M,uploads/sample_unknown_001.png,Tuberculosis,2026-04-05,simulated_lasalle

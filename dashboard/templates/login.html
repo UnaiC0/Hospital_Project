@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hospital Central — Acceso</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body class="login-body">
+
+    <div class="login-shell">
+
+      <!-- ── Panel izquierdo: marca + ilustración ── -->
+      <div class="login-brand-panel">
+        <div class="login-brand-top">
+          <div class="login-logo">
+            <span class="material-symbols-outlined">local_hospital</span>
+          </div>
+          <div>
+            <div class="login-org">Hospital Central</div>
+            <div class="login-sys">Sistema de Radiología</div>
+          </div>
+        </div>
+
+        <div class="login-hero-text">
+          <h1>Diagnóstico asistido<br>por inteligencia<br>artificial</h1>
+          <p>
+            Plataforma clínica para la clasificación automatizada
+            de radiografías de tórax. Detecta patrones compatibles
+            con pulmones sanos, neumonía y COVID-19 en tiempo real.
+          </p>
+        </div>
+
+        <!-- Chest X-ray SVG -->
+        <div class="login-xray">
+          <svg viewBox="0 0 220 265" width="210" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor">
+            <path d="M58 62 Q85 50 110 54" stroke-width="2.5" opacity="0.5"/>
+            <path d="M162 62 Q135 50 110 54" stroke-width="2.5" opacity="0.5"/>
+            <line x1="110" y1="28" x2="110" y2="68" stroke-width="3.5" opacity="0.35"/>
+            <path d="M110 68 Q96 76 82 74" stroke-width="2" opacity="0.3"/>
+            <path d="M110 68 Q124 76 138 74" stroke-width="2" opacity="0.3"/>
+            <path d="M50 74 Q24 96 26 162 Q36 194 64 192 Q84 190 93 170 Q100 148 97 102 Q94 70 50 74Z" stroke-width="2.2" opacity="0.65"/>
+            <path d="M170 74 Q196 96 194 162 Q184 194 156 192 Q136 190 127 170 Q120 148 123 102 Q126 70 170 74Z" stroke-width="2.2" opacity="0.65"/>
+            <path d="M90 110 Q74 116 76 148 Q82 170 110 178 Q138 170 144 148 Q146 116 130 110 Q120 106 110 114 Q100 106 90 110Z" stroke-width="1.8" opacity="0.35"/>
+            <line x1="110" y1="46" x2="110" y2="235" stroke-width="2.5" opacity="0.25"/>
+            <path d="M101 83  Q70 81  50  93" stroke-width="1.5" opacity="0.28"/>
+            <path d="M101 98  Q66 96  44 110" stroke-width="1.5" opacity="0.28"/>
+            <path d="M101 113 Q63 113 40 128" stroke-width="1.5" opacity="0.28"/>
+            <path d="M101 128 Q61 129 40 146" stroke-width="1.5" opacity="0.23"/>
+            <path d="M101 143 Q63 145 44 164" stroke-width="1.5" opacity="0.19"/>
+            <path d="M119 83  Q150 81  170  93" stroke-width="1.5" opacity="0.28"/>
+            <path d="M119 98  Q154 96  176 110" stroke-width="1.5" opacity="0.28"/>
+            <path d="M119 113 Q157 113 180 128" stroke-width="1.5" opacity="0.28"/>
+            <path d="M119 128 Q159 129 180 146" stroke-width="1.5" opacity="0.23"/>
+            <path d="M119 143 Q157 145 176 164" stroke-width="1.5" opacity="0.19"/>
+            <path d="M36 198 Q110 215 184 198" stroke-width="2" opacity="0.25"/>
+          </svg>
+        </div>
+
+        <div class="login-brand-tags">
+          <span>ResNet / CNN</span>
+          <span>Apache Spark</span>
+          <span>MinIO</span>
+        </div>
+      </div>
+
+      <!-- ── Panel derecho: formulario ── -->
+      <div class="login-form-panel">
+        <div class="login-card">
+          <div class="login-card-header">
+            <h2>Acceso al sistema</h2>
+            <p>Introduzca sus credenciales para continuar</p>
+          </div>
+
+          {% if error %}
+          <div class="login-error">
+            <span class="material-symbols-outlined">error</span>
+            {{ error }}
+          </div>
+          {% endif %}
+
+          <form class="login-form" method="post" action="/login" autocomplete="off">
+            <div class="login-field">
+              <label for="username">
+                <span class="material-symbols-outlined">person</span>
+                Usuario
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                placeholder="nombre de usuario"
+                required
+                autofocus
+                autocomplete="username"
+              />
+            </div>
+
+            <div class="login-field">
+              <label for="password">
+                <span class="material-symbols-outlined">lock</span>
+                Contraseña
+              </label>
+              <div class="login-pass-wrap">
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                  autocomplete="current-password"
+                />
+                <button type="button" class="toggle-pass" aria-label="Mostrar contraseña" data-target="password">
+                  <span class="material-symbols-outlined">visibility</span>
+                </button>
+              </div>
+            </div>
+
+            <button class="btn-login" type="submit">
+              <span class="material-symbols-outlined">login</span>
+              Iniciar sesión
+            </button>
+          </form>
+
+          <div class="login-roles-hint">
+            <div class="role-hint role-hint--admin">
+              <span class="material-symbols-outlined">admin_panel_settings</span>
+              <div>
+                <strong>Administrador</strong>
+                <span>Acceso completo al sistema</span>
+              </div>
+            </div>
+            <div class="role-hint role-hint--user">
+              <span class="material-symbols-outlined">stethoscope</span>
+              <div>
+                <strong>Doctor</strong>
+                <span>Estudios e informes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="login-footer">
+          Herramienta de apoyo clínico &mdash; uso exclusivo del personal autorizado.
+        </p>
+      </div>
+
+    </div>
+
+    <script>
+      document.querySelectorAll(".toggle-pass").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const input = document.getElementById(btn.dataset.target);
+          const icon  = btn.querySelector(".material-symbols-outlined");
+          if (input.type === "password") {
+            input.type = "text";
+            icon.textContent = "visibility_off";
+          } else {
+            input.type = "password";
+            icon.textContent = "visibility";
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

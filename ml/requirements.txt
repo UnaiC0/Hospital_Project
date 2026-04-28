@@ -1,0 +1,4 @@
+torch>=2.4,<3.0
+torchvision>=0.19,<1.0
+scikit-learn>=1.4,<2.0
+pillow>=10.3,<12.0

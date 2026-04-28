@@ -1,16 +1,42 @@
 import base64
 import os
 from io import BytesIO
+from pathlib import Path
 from uuid import uuid4
 
 import boto3
 import requests
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, request, session, url_for
 from PIL import Image, UnidentifiedImageError
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+
+
+def load_local_env(path: Path) -> None:
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+
+
+if load_dotenv:
+    load_dotenv(ENV_PATH)
+else:
+    load_local_env(ENV_PATH)
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png"}
@@ -53,16 +79,73 @@ RESULT_CONTENT = {
         ),
     },
 }
+
+
+def required_env(name: str) -> str:
+    value = os.getenv(name)
+    if value is None or value == "":
+        raise RuntimeError(f"Falta configurar {name} en .env.")
+    return value
+
+
 BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000").rstrip("/")
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000").rstrip("/")
-MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "")
-MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "")
-MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", "hospital-data")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY") or required_env("MINIO_ROOT_USER")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY") or required_env("MINIO_ROOT_PASSWORD")
+MINIO_BUCKET_NAME = required_env("MINIO_BUCKET_NAME")
 MINIO_REGION = os.getenv("MINIO_REGION", "us-east-1")
 MINIO_CONSOLE_URL = os.getenv("MINIO_CONSOLE_URL", "http://localhost:9001").rstrip("/")
 
+
+SECRET_KEY = required_env("SECRET_KEY")
+
+USERS = {
+    required_env("ADMIN_USERNAME"): {
+        "password_hash": required_env("ADMIN_PASSWORD_HASH"),
+        "role": "admin",
+        "display_name": "Administrador",
+    },
+    required_env("USER_USERNAME"): {
+        "password_hash": required_env("USER_PASSWORD_HASH"),
+        "role": "user",
+        "display_name": "Doctor",
+    },
+}
+
+if len(USERS) != 2:
+    raise RuntimeError("ADMIN_USERNAME y USER_USERNAME deben ser distintos.")
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = (
+    os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+)
+app.secret_key = SECRET_KEY
+
+
+def get_current_user():
+    username = session.get("username")
+    if not username:
+        return None
+    return {
+        "username": username,
+        "role": session.get("role", "user"),
+        "display_name": session.get("display_name", username),
+    }
+
+
+@app.context_processor
+def inject_user():
+    return {"current_user": get_current_user()}
+
+
+@app.before_request
+def require_login():
+    public = {"login_page", "login_submit", "logout", "static"}
+    if request.endpoint not in public and "username" not in session:
+        return redirect(url_for("login_page"))
 
 
 class ValidationError(Exception):
@@ -178,11 +261,20 @@ def upload_to_minio(file_bytes: bytes, extension: str, mime_type: str) -> str:
         raise RuntimeError("No se pudo subir la imagen a MinIO.") from exc
 
 
-def request_prediction(file_bytes: bytes, filename: str, mime_type: str) -> dict[str, object]:
+def request_prediction(
+    file_bytes: bytes,
+    filename: str,
+    mime_type: str,
+    source_object_key: str | None = None,
+) -> dict[str, object]:
     try:
+        form_data = {}
+        if source_object_key:
+            form_data["source_object_key"] = source_object_key
         response = requests.post(
             f"{BACKEND_URL}/predict",
             files={"file": (filename, file_bytes, mime_type)},
+            data=form_data,
             timeout=30,
         )
     except requests.RequestException as exc:
@@ -219,11 +311,73 @@ def request_prediction(file_bytes: bytes, filename: str, mime_type: str) -> dict
     return {
         "class": prediction_class,
         "probabilities": normalized_probabilities,
+        "study_id": payload.get("study_id"),
+        "created_at": payload.get("created_at"),
+        "confidence": payload.get("confidence"),
+        "storage": payload.get("storage") if isinstance(payload.get("storage"), dict) else {},
+        "quality_status": payload.get("quality_status"),
+        "quality_flags": payload.get("quality_flags") if isinstance(payload.get("quality_flags"), list) else [],
+        "events": payload.get("events") if isinstance(payload.get("events"), list) else [],
     }
 
 
 def format_file_size(file_bytes: bytes) -> str:
     return f"{len(file_bytes) / (1024 * 1024):.1f} MB"
+
+
+def get_default_dashboard_data() -> dict[str, object]:
+    return {
+        "backend_status": "no disponible",
+        "metrics": {
+            "radiology": {
+                "total_studies": 0,
+                "class_distribution": {
+                    "Sana": 0,
+                    "Neumonia": 0,
+                    "COVID-19": 0,
+                },
+                "warning_count": 0,
+                "average_confidence": 0,
+                "last_study_at": None,
+            },
+            "triage": {"total_records": 0},
+            "pipeline": {"latest_run": None},
+            "quality": {"open_events_by_severity": {}},
+        },
+        "recent_studies": [],
+        "quality_events": [],
+    }
+
+
+def backend_get(path: str, default):
+    try:
+        response = requests.get(f"{BACKEND_URL}{path}", timeout=5)
+        if response.status_code != 200:
+            return default
+        return response.json()
+    except requests.RequestException:
+        return default
+
+
+def fetch_dashboard_data() -> dict[str, object]:
+    data = get_default_dashboard_data()
+    health = backend_get("/health", {})
+    if isinstance(health, dict):
+        data["backend_status"] = health.get("status", "no disponible")
+
+    metrics = backend_get("/metrics", None)
+    if isinstance(metrics, dict):
+        data["metrics"] = metrics
+
+    studies = backend_get("/studies/history?limit=6", {})
+    if isinstance(studies, dict) and isinstance(studies.get("items"), list):
+        data["recent_studies"] = studies["items"]
+
+    events = backend_get("/quality/events?limit=6", {})
+    if isinstance(events, dict) and isinstance(events.get("items"), list):
+        data["quality_events"] = events["items"]
+
+    return data
 
 
 def normalize_probabilities(probabilities=None):
@@ -281,10 +435,14 @@ def build_template_context(
     object_key=None,
     uploaded_filename=None,
     uploaded_size=None,
+    study_id=None,
+    report_object_key=None,
+    dashboard_data=None,
 ):
     has_image = bool(image_preview)
     has_result = bool(prediction_class)
     result = build_result_context(prediction_class)
+    dashboard_data = dashboard_data or fetch_dashboard_data()
 
     if uploaded_filename and uploaded_size and has_result:
         file_status = f"{uploaded_size} - Analisis completado"
@@ -300,6 +458,8 @@ def build_template_context(
         "prediction_class": prediction_class,
         "probability_rows": normalize_probabilities(probabilities),
         "object_key": object_key,
+        "study_id": study_id,
+        "report_object_key": report_object_key,
         "uploaded_filename": uploaded_filename or "Ningun archivo cargado",
         "uploaded_size": uploaded_size,
         "file_status": file_status,
@@ -309,6 +469,10 @@ def build_template_context(
         "minio_bucket_name": MINIO_BUCKET_NAME,
         "minio_console_url": MINIO_CONSOLE_URL,
         "minio_endpoint": MINIO_ENDPOINT,
+        "backend_status": dashboard_data["backend_status"],
+        "dashboard_metrics": dashboard_data["metrics"],
+        "recent_studies": dashboard_data["recent_studies"],
+        "quality_events": dashboard_data["quality_events"],
     }
 
 
@@ -323,6 +487,33 @@ def handle_large_file(_error):
         ),
         413,
     )
+
+
+@app.get("/login")
+def login_page():
+    if "username" in session:
+        return redirect(url_for("index"))
+    return render_template("login.html", error=request.args.get("error"))
+
+
+@app.post("/login")
+def login_submit():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    user = USERS.get(username)
+    if user and check_password_hash(user["password_hash"], password):
+        session.clear()
+        session["username"] = username
+        session["role"] = user["role"]
+        session["display_name"] = user["display_name"]
+        return redirect(url_for("index"))
+    return redirect(url_for("login_page", error="Usuario o contraseña incorrectos."))
+
+
+@app.get("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login_page"))
 
 
 @app.get("/")
@@ -354,6 +545,7 @@ def upload():
             validated_file["file_bytes"],
             validated_file["original_name"],
             validated_file["mime_type"],
+            object_key,
         )
 
         return render_template(
@@ -364,6 +556,8 @@ def upload():
                 prediction_class=prediction["class"],
                 probabilities=prediction["probabilities"],
                 object_key=object_key,
+                study_id=prediction.get("study_id"),
+                report_object_key=prediction.get("storage", {}).get("report_object_key"),
                 uploaded_filename=uploaded_filename,
                 uploaded_size=uploaded_size,
             ),

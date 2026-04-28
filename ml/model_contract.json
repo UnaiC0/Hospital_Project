@@ -1,0 +1,18 @@
+{
+  "name": "radiology-cnn-resnet18",
+  "version": "0.1.0",
+  "task": "Clasificacion de radiografias de torax",
+  "labels": ["Sana", "Neumonia", "COVID-19"],
+  "input": {
+    "format": "RGB image",
+    "size": [224, 224],
+    "normalization_mean": [0.485, 0.456, 0.406],
+    "normalization_std": [0.229, 0.224, 0.225]
+  },
+  "outputs": {
+    "class": "Etiqueta con mayor probabilidad",
+    "probabilities": "Distribucion por clase",
+    "confidence": "Probabilidad de la clase predicha"
+  },
+  "clinical_note": "Modelo de apoyo. Requiere validacion clinica y revision humana antes de uso real."
+}
