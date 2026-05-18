@@ -7,8 +7,10 @@ from app.auth.session import require_login
 from app.core.logging import get_logger
 from app.presenters.page import PageInputs, PagePresenter
 from app.presenters.prediction import build_image_preview, format_file_size, normalize_backend_prediction
+from app.presenters.triage import build_triage_result
 from app.services.backend_client import BackendClient, BackendError
 from app.services.storage_client import StorageClient, StorageError
+from app.triage.parser import TriageValidationError, empty_triage_form_values, parse_triage_form
 from app.validation.image import ValidationError, validate_upload
 
 
@@ -105,6 +107,53 @@ def _render_error(message, status_code, image_preview, filename, size):
         )
     )
     return render_template("index.html", **context), status_code
+
+
+@bp.post("/triage")
+@require_login
+def triage_submit():
+    try:
+        payload, raw_values = parse_triage_form(request.form)
+    except TriageValidationError as exc:
+        context = _presenter().build_context(
+            PageInputs(
+                triage_error=str(exc),
+                triage_form_values={**empty_triage_form_values(), **dict(request.form)},
+                default_tab="triage",
+            )
+        )
+        return render_template("index.html", **context), 400
+
+    try:
+        backend_response = _backend().request_triage(payload)
+    except BackendError as exc:
+        context = _presenter().build_context(
+            PageInputs(
+                triage_error=str(exc),
+                triage_form_values=raw_values,
+                default_tab="triage",
+            )
+        )
+        return render_template("index.html", **context), 502
+
+    assessment = (
+        backend_response.get("patient_assessment")
+        or backend_response.get("assessment")
+        or {}
+    )
+    triage_view = build_triage_result(assessment)
+    triage_view["triage_id"] = backend_response.get("triage_id")
+    triage_view["storage"] = backend_response.get("storage")
+
+    context = _presenter().build_context(
+        PageInputs(
+            triage_result=triage_view,
+            triage_form_values=raw_values,
+            triage_success="Triaje evaluado correctamente.",
+            default_tab="triage",
+        )
+    )
+    return render_template("index.html", **context)
 
 
 @bp.app_errorhandler(RequestEntityTooLarge)

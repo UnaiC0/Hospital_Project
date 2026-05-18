@@ -516,7 +516,7 @@
                     <div class="card-icon"><span class="material-symbols-outlined">monitor_heart</span></div>
                   </div>
 
-                  <form class="triage-form" action="{{ url_for('triage_submit') }}" method="post">
+                  <form class="triage-form" action="{{ url_for('main.triage_submit') }}" method="post">
                     <div class="triage-vitals-grid">
                       {% for key, label, default, unit, vmin, vmax in triage_vital_fields %}
                       <label class="triage-field">

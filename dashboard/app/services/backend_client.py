@@ -49,6 +49,24 @@ class BackendClient:
             raise BackendError("La respuesta del backend no es valida.")
         return payload
 
+    def request_triage(self, payload: dict) -> dict[str, Any]:
+        try:
+            response = requests.post(
+                f"{self._base_url}/triage",
+                json=payload,
+                timeout=self._timeout,
+            )
+        except requests.RequestException as exc:
+            raise BackendError("No se pudo conectar con el backend de triaje.") from exc
+
+        data = self._parse_json(response)
+        if response.status_code != 200:
+            detail = data.get("detail") if isinstance(data, dict) else None
+            raise BackendError(detail if isinstance(detail, str) and detail else "El backend no pudo evaluar el triaje.")
+        if not isinstance(data, dict):
+            raise BackendError("La respuesta del backend no tiene el formato esperado.")
+        return data
+
     # ---- read paths ----
     def get(self, path: str, default: Any) -> Any:
         try:

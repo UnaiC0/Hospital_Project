@@ -9,6 +9,8 @@ from app.presenters.prediction import (
     normalize_probabilities,
 )
 from app.services.dashboard_data import DashboardDataService
+from app.triage.catalog import TRIAGE_SYMPTOMS, TRIAGE_VITAL_FIELDS
+from app.triage.parser import empty_triage_form_values
 
 
 @dataclass(frozen=True)
@@ -23,6 +25,11 @@ class PageInputs:
     uploaded_size: str | None = None
     study_id: str | None = None
     report_object_key: str | None = None
+    triage_result: dict | None = None
+    triage_form_values: dict | None = None
+    triage_error: str | None = None
+    triage_success: str | None = None
+    default_tab: str = "radiology"
 
 
 class PagePresenter:
@@ -62,6 +69,16 @@ class PagePresenter:
             "dashboard_metrics": dashboard["metrics"],
             "recent_studies": dashboard["recent_studies"],
             "quality_events": dashboard["quality_events"],
+            "recent_triages": dashboard.get("recent_triages", []),
+            "triage_model_status": dashboard.get("triage_model", {"loaded": False, "model_name": None}),
+            "triage_result": inputs.triage_result,
+            "triage_form_values": inputs.triage_form_values or empty_triage_form_values(),
+            "triage_error": inputs.triage_error,
+            "triage_success": inputs.triage_success,
+            "triage_symptoms_catalog": TRIAGE_SYMPTOMS,
+            "triage_vital_fields": TRIAGE_VITAL_FIELDS,
+            "has_triage": bool(inputs.triage_result),
+            "default_tab": inputs.default_tab if not inputs.triage_result else "triage",
         }
 
     @staticmethod

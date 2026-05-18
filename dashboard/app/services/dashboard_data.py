@@ -29,6 +29,17 @@ class DashboardDataService:
         if isinstance(events, dict) and isinstance(events.get("items"), list):
             data["quality_events"] = events["items"]
 
+        triages = self._backend.get("/triage/history?limit=6", {})
+        if isinstance(triages, dict) and isinstance(triages.get("items"), list):
+            data["recent_triages"] = triages["items"]
+
+        if isinstance(metrics, dict):
+            services = metrics.get("services")
+            if isinstance(services, dict):
+                tm = services.get("triage_model")
+                if isinstance(tm, dict):
+                    data["triage_model"] = tm
+
         return data
 
     @staticmethod
@@ -49,4 +60,6 @@ class DashboardDataService:
             },
             "recent_studies": [],
             "quality_events": [],
+            "recent_triages": [],
+            "triage_model": {"loaded": False, "model_name": None},
         }
