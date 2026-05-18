@@ -26,7 +26,6 @@ services:
       MINIO_BUCKET_NAME: "${MINIO_BUCKET_NAME:?Set MINIO_BUCKET_NAME in .env}"
       MINIO_AUTO_CREATE_BUCKET: ${MINIO_AUTO_CREATE_BUCKET:-true}
       SPARK_MASTER_URL: spark://spark:7077
-      TRIAGE_MODEL_PATH: /models/triage_model.joblib
     volumes:
       - ./models:/models:ro
     depends_on:

@@ -52,7 +52,7 @@ class TriageService:
             "model_name": "hospital-triage-embedded",
             "risk_level": risk_level,
             "recommended_priority": recommended_priority,
-            "confidence": round(0.65 + (score / 200), 2),
+            "confidence": round(min(0.99, 0.65 + (score / 200)), 2),
             "score": score,
         }
 
