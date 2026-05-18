@@ -26,6 +26,9 @@ services:
       MINIO_BUCKET_NAME: "${MINIO_BUCKET_NAME:?Set MINIO_BUCKET_NAME in .env}"
       MINIO_AUTO_CREATE_BUCKET: ${MINIO_AUTO_CREATE_BUCKET:-true}
       SPARK_MASTER_URL: spark://spark:7077
+      TRIAGE_MODEL_PATH: /models/triage_model.joblib
+    volumes:
+      - ./models:/models:ro
     depends_on:
       db:
         condition: service_healthy
@@ -169,6 +172,25 @@ services:
       PRETRAINED: ${TRAINING_PRETRAINED:-false}
     volumes:
       - ./data:/data
+      - ./models:/models
+    networks:
+      - hospital_network
+
+  triage-trainer:
+    build: ./ml
+    container_name: hospital-triage-trainer
+    restart: "no"
+    profiles:
+      - triage-training
+    command: ["python", "train_triage.py"]
+    environment:
+      MODEL_DIR: /models
+      TRIAGE_SAMPLES: ${TRIAGE_SAMPLES:-8000}
+      TRIAGE_N_ESTIMATORS: ${TRIAGE_N_ESTIMATORS:-400}
+      TRIAGE_MAX_DEPTH: ${TRIAGE_MAX_DEPTH:-12}
+      TRIAGE_NOISE_RATE: ${TRIAGE_NOISE_RATE:-0.06}
+      TRIAGE_RANDOM_STATE: ${TRIAGE_RANDOM_STATE:-42}
+    volumes:
       - ./models:/models
     networks:
       - hospital_network
