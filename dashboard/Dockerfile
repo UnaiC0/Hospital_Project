@@ -12,4 +12,4 @@ COPY . .
 
 EXPOSE 8501
 
-CMD ["python", "app.py"]
+CMD ["python", "wsgi.py"]
