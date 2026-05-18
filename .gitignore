@@ -11,3 +11,5 @@ data/processed/*
 data/radiology_dataset/
 models/*
 !models/.gitkeep
+infrastructure/traefik/certs/*
+!infrastructure/traefik/certs/README.md

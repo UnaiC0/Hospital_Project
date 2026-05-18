@@ -86,7 +86,7 @@
               {% if current_user.role == 'admin' %}Administrador{% else %}Doctor{% endif %}
             </span>
           </div>
-          <a href="{{ url_for('logout') }}" class="logout-btn" title="Cerrar sesión">
+          <a href="{{ url_for('auth.logout') }}" class="logout-btn" title="Cerrar sesión">
             <span class="material-symbols-outlined">logout</span>
           </a>
         </div>
@@ -417,7 +417,7 @@
                     <div class="card-icon"><span class="material-symbols-outlined">upload</span></div>
                   </div>
 
-                  <form class="analysis-form" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+                  <form class="analysis-form" action="{{ url_for('main.upload') }}" method="post" enctype="multipart/form-data">
                     <input
                       id="file-input"
                       class="visually-hidden"
@@ -516,7 +516,7 @@
                     <div class="card-icon"><span class="material-symbols-outlined">monitor_heart</span></div>
                   </div>
 
-                  <form class="triage-form" action="{{ url_for('triage_submit') }}" method="post">
+                  <form class="triage-form" action="{{ url_for('main.triage_submit') }}" method="post">
                     <div class="triage-vitals-grid">
                       {% for key, label, default, unit, vmin, vmax in triage_vital_fields %}
                       <label class="triage-field">
