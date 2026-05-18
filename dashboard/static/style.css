@@ -1385,3 +1385,170 @@ code { font-family: "IBM Plex Mono", Consolas, monospace; font-size: .92em; }
   .diagnosis-banner__icon { font-size: 48px; }
   .app-footer          { padding: 16px; }
 }
+
+/* ═══════════════════ TRIAJE ═══════════════════ */
+.triage-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.15fr);
+  gap: 22px;
+}
+@media (max-width: 1100px) {
+  .triage-layout { grid-template-columns: 1fr; }
+}
+
+.triage-form { display: flex; flex-direction: column; gap: 20px; padding-top: 4px; }
+
+.triage-vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 12px;
+}
+
+.triage-field { display: flex; flex-direction: column; gap: 6px; }
+.triage-field__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.triage-field__label small { font-weight: 400; color: var(--muted); text-transform: none; letter-spacing: 0; }
+
+.triage-input {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 11px;
+  font: inherit;
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color .15s, box-shadow .15s;
+}
+.triage-input:focus {
+  outline: none;
+  border-color: var(--primary-mid);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.triage-symptoms { display: flex; flex-direction: column; gap: 10px; }
+.triage-symptoms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+.triage-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-soft);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background .15s, border-color .15s;
+}
+.triage-chip:hover { border-color: var(--primary-mid); background: var(--primary-pale); }
+.triage-chip input { accent-color: var(--primary); }
+.triage-chip:has(input:checked) { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); font-weight: 600; }
+
+.triage-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  border-radius: var(--r);
+  margin: 12px 0 4px;
+  color: #fff;
+}
+.triage-banner__main { display: flex; flex-direction: column; gap: 2px; }
+.triage-banner__eyebrow { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; }
+.triage-banner__title { font-size: 26px; font-weight: 700; }
+.triage-banner__sub { font-size: 13px; opacity: 0.92; }
+.triage-banner__metrics { display: flex; gap: 18px; }
+.triage-banner__metrics > div { display: flex; flex-direction: column; align-items: flex-end; }
+.triage-metric__val { font-size: 22px; font-weight: 700; }
+.triage-metric__lbl { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+
+.triage-banner--low      { background: linear-gradient(135deg, #059669, #10b981); }
+.triage-banner--medium   { background: linear-gradient(135deg, #d97706, #f59e0b); }
+.triage-banner--high     { background: linear-gradient(135deg, #ea580c, #f97316); }
+.triage-banner--critical { background: linear-gradient(135deg, #b91c1c, #dc2626); }
+
+.triage-section { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+
+.prob-fill-risk-low      { background: linear-gradient(90deg, #10b981, #34d399); }
+.prob-fill-risk-medium   { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.prob-fill-risk-high     { background: linear-gradient(90deg, #f97316, #fb923c); }
+.prob-fill-risk-critical { background: linear-gradient(90deg, #dc2626, #ef4444); }
+
+.triage-contributors { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.triage-contributors li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+}
+.triage-contributors code { color: var(--primary-dark); font-weight: 600; }
+.triage-contrib-val { color: var(--muted); }
+.triage-contrib-imp { color: var(--primary); font-weight: 600; }
+
+.triage-alerts { gap: 8px; }
+.triage-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: var(--r-sm);
+  color: #9a3412;
+  font-size: 13px;
+}
+.triage-alert .material-symbols-outlined { color: #ea580c; }
+
+.triage-footer {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.triage-footer code { color: var(--text-mid); }
+.triage-disclaimer { flex-basis: 100%; font-style: italic; color: var(--muted-light); }
+
+.triage-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 18px;
+  color: var(--muted);
+  gap: 14px;
+}
+.triage-placeholder .material-symbols-outlined { font-size: 56px; color: var(--primary-mid); opacity: 0.65; }
+.triage-placeholder p { max-width: 360px; line-height: 1.6; font-size: 13.5px; }
+
+.triage-pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+}
+.triage-pill--low      { background: #059669; }
+.triage-pill--medium   { background: #d97706; }
+.triage-pill--high     { background: #ea580c; }
+.triage-pill--critical { background: #dc2626; }

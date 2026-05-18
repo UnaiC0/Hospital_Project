@@ -32,6 +32,8 @@ El flujo principal es: navegador -> dashboard -> MinIO -> backend -> PostgreSQL/
 
 El backend incluye un clasificador basal de imagen que utiliza estadisticos de intensidad y contraste para mantener el sistema operativo sin dataset externo. No debe presentarse como modelo clinico final.
 
+Para el triaje de urgencias el repositorio incluye `ml/train_triage.py`, que entrena un Random Forest calibrado isotonicamente sobre cuatro clases de riesgo (`low`, `medium`, `high`, `critical`). Se ha elegido Random Forest porque los datos son tabulares y de pequena escala, requiere alta interpretabilidad clinica y permite extraer probabilidades calibradas e importancia de variables sin GPU. El dataset es sintetico, inspirado en MEWS/NEWS2, con ruido controlado en las etiquetas para forzar generalizacion. El artefacto se guarda en `models/triage_model.joblib` y lo consume el backend a traves de `backend/app/triage_model.py`, con fallback automatico al baseline por reglas si el modelo no esta disponible. Para entrenar: `docker compose --profile triage-training up triage-trainer`.
+
 Para cubrir el modulo de Deep Learning, el repositorio incluye `ml/train_cnn.py`, que entrena una ResNet18 sobre tres clases: `Sana`, `Neumonia` y `COVID-19`. El entrenamiento genera:
 - Pesos del modelo.
 - Accuracy de validacion.

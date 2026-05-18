@@ -18,6 +18,8 @@ from PIL import Image, ImageStat, UnidentifiedImageError
 from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 
+from app import triage_model
+
 
 def required_env(name: str) -> str:
     value = os.getenv(name)
@@ -218,7 +220,7 @@ class TriageRequest(BaseModel):
     notes: str | None = None
 
 
-def compute_triage(payload: TriageRequest) -> dict[str, Any]:
+def compute_triage_baseline(payload: TriageRequest) -> dict[str, Any]:
     symptoms = {symptom.strip().lower() for symptom in payload.symptoms if symptom}
     heart_rate = float(payload.vitals.get("heart_rate", 0) or 0)
     oxygen_saturation = float(payload.vitals.get("oxygen_saturation", 100) or 100)
@@ -251,12 +253,28 @@ def compute_triage(payload: TriageRequest) -> dict[str, Any]:
         recommended_priority = "standard"
 
     return {
-        "model_name": "hospital-triage-embedded",
+        "model_name": "hospital-triage-rules-fallback",
+        "model_version": "0.0.1",
+        "model_family": "rule_based_baseline",
         "risk_level": risk_level,
         "recommended_priority": recommended_priority,
         "confidence": round(0.65 + (score / 200), 2),
         "score": score,
+        "probabilities": {},
+        "top_contributors": [],
+        "alerts": [],
+        "clinical_note": (
+            "Resultado generado por reglas baseline porque no hay modelo "
+            "entrenado disponible. Apoyo a la decision, no diagnostico."
+        ),
     }
+
+
+def compute_triage(payload: TriageRequest) -> dict[str, Any]:
+    model_result = triage_model.predict(payload.symptoms, payload.vitals)
+    if model_result is not None:
+        return model_result
+    return compute_triage_baseline(payload)
 
 
 async def read_and_validate_prediction_file(upload_file: UploadFile) -> bytes:
@@ -687,10 +705,10 @@ def persist_triage_record(payload: dict[str, Any], assessment: dict[str, Any]) -
                     created_at,
                     json.dumps(payload),
                     json.dumps(assessment),
-                    assessment.get("risk_level", "unknown"),
-                    assessment.get("recommended_priority", "unknown"),
-                    int(assessment.get("score", 0)),
-                    float(assessment.get("confidence", 0)),
+                    str(assessment.get("risk_level", "unknown")),
+                    str(assessment.get("recommended_priority", "unknown")),
+                    int(assessment.get("score", 0) or 0),
+                    float(assessment.get("confidence", 0) or 0),
                     MINIO_BUCKET_NAME,
                     object_key,
                 ),
@@ -1053,6 +1071,7 @@ async def health() -> dict[str, Any]:
         "status": status,
         "services": {
             "inference_engine": "embedded",
+            "triage_model": triage_model.model_status(),
             "postgres": postgres_status,
             "minio": minio_status,
             "spark": SPARK_MASTER_URL,
@@ -1082,9 +1101,37 @@ async def triage(payload: TriageRequest) -> dict[str, Any]:
             detail=f"Failed to persist triage result: {exc}",
         ) from exc
 
+    events: list[dict[str, Any]] = []
+    risk_level = assessment.get("risk_level", "unknown")
+    confidence = float(assessment.get("confidence", 0) or 0)
+    triage_id = storage_result["triage_id"]
+
+    if risk_level == "critical":
+        events.append(
+            await run_in_threadpool(
+                record_quality_event,
+                source="triage",
+                severity="high",
+                event_type="clinical_alert",
+                message="Triaje clasificado como critico: requiere atencion inmediata.",
+                metadata={"triage_id": triage_id, "confidence": confidence},
+            )
+        )
+    if confidence and confidence < 0.55:
+        events.append(
+            await run_in_threadpool(
+                record_quality_event,
+                source="triage",
+                severity="medium",
+                event_type="low_model_confidence",
+                message="Triaje con baja confianza del modelo.",
+                metadata={"triage_id": triage_id, "confidence": confidence},
+            )
+        )
+
     return {
         "status": "accepted",
-        "triage_id": storage_result["triage_id"],
+        "triage_id": triage_id,
         "created_at": storage_result["created_at"],
         "patient_assessment": assessment,
         "storage": {
@@ -1092,6 +1139,7 @@ async def triage(payload: TriageRequest) -> dict[str, Any]:
             "minio_bucket": storage_result["report_bucket"],
             "minio_object_key": storage_result["report_object_key"],
         },
+        "events": events,
     }
 
 

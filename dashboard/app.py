@@ -50,6 +50,42 @@ PROBABILITY_TONES = {
     "Neumonia": "pneumonia",
     "COVID-19": "covid",
 }
+
+TRIAGE_SYMPTOMS = [
+    ("chest pain", "Dolor toracico"),
+    ("shortness of breath", "Disnea"),
+    ("loss of consciousness", "Perdida de conciencia"),
+    ("fever", "Fiebre"),
+    ("cough", "Tos"),
+    ("abdominal pain", "Dolor abdominal"),
+    ("headache", "Cefalea"),
+    ("dizziness", "Mareo"),
+    ("vomiting", "Vomitos"),
+    ("bleeding", "Sangrado"),
+]
+
+TRIAGE_VITAL_FIELDS = [
+    ("age", "Edad", 45, "años", 0, 120),
+    ("heart_rate", "Frecuencia cardiaca", 80, "lpm", 20, 220),
+    ("oxygen_saturation", "Saturacion O2", 98, "%", 50, 100),
+    ("systolic_bp", "Presion sistolica", 120, "mmHg", 40, 260),
+    ("respiratory_rate", "Frec. respiratoria", 16, "rpm", 4, 60),
+    ("temperature", "Temperatura", 36.8, "C", 30, 43),
+]
+
+TRIAGE_RISK_LABELS = ["low", "medium", "high", "critical"]
+TRIAGE_RISK_DISPLAY = {
+    "low": "Bajo",
+    "medium": "Medio",
+    "high": "Alto",
+    "critical": "Critico",
+}
+TRIAGE_PRIORITY_DISPLAY = {
+    "standard": "Estandar",
+    "priority": "Prioritario",
+    "urgent": "Urgente",
+    "immediate": "Inmediato",
+}
 RESULT_CONTENT = {
     "Sana": {
         "slug": "healthy",
@@ -325,6 +361,126 @@ def format_file_size(file_bytes: bytes) -> str:
     return f"{len(file_bytes) / (1024 * 1024):.1f} MB"
 
 
+def parse_triage_form(form) -> tuple[dict, dict]:
+    """Devuelve (payload_para_backend, valores_originales_para_repintar)."""
+    vitals: dict[str, float] = {}
+    raw_values: dict[str, str] = {}
+    for key, _label, default, _unit, vmin, vmax in TRIAGE_VITAL_FIELDS:
+        raw = (form.get(key) or "").strip()
+        raw_values[key] = raw
+        if raw == "":
+            vitals[key] = float(default)
+            continue
+        try:
+            value = float(raw.replace(",", "."))
+        except ValueError as exc:
+            raise ValidationError(f"El campo '{key}' debe ser numerico.") from exc
+        if value < vmin or value > vmax:
+            raise ValidationError(
+                f"El campo '{key}' debe estar entre {vmin} y {vmax}."
+            )
+        vitals[key] = value
+
+    selected = form.getlist("symptoms") if hasattr(form, "getlist") else []
+    valid_symptoms = {s for s, _ in TRIAGE_SYMPTOMS}
+    symptoms = [s for s in selected if s in valid_symptoms]
+
+    payload = {"symptoms": symptoms, "vitals": vitals}
+    raw_values["symptoms"] = symptoms
+    return payload, raw_values
+
+
+def request_triage(payload: dict) -> dict:
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/triage",
+            json=payload,
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError("No se pudo conectar con el backend de triaje.") from exc
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise RuntimeError("La respuesta del backend no es valida.") from exc
+
+    if response.status_code != 200:
+        detail = data.get("detail") if isinstance(data, dict) else None
+        if isinstance(detail, str) and detail:
+            raise RuntimeError(detail)
+        raise RuntimeError("El backend no pudo evaluar el triaje.")
+
+    if not isinstance(data, dict):
+        raise RuntimeError("La respuesta del backend no tiene el formato esperado.")
+    return data
+
+
+def build_triage_result(data: dict) -> dict:
+    risk = str(data.get("risk_level", "")).lower()
+    priority = str(data.get("recommended_priority", "")).lower()
+    confidence = data.get("confidence") or 0.0
+    try:
+        confidence_pct = round(float(confidence) * 100, 1)
+    except (TypeError, ValueError):
+        confidence_pct = 0.0
+
+    raw_probs = data.get("probabilities") or {}
+    probability_rows = []
+    for label in TRIAGE_RISK_LABELS:
+        try:
+            value = float(raw_probs.get(label, 0.0))
+        except (TypeError, ValueError):
+            value = 0.0
+        value = max(0.0, min(1.0, value))
+        probability_rows.append(
+            {
+                "label": label,
+                "display": TRIAGE_RISK_DISPLAY.get(label, label.capitalize()),
+                "tone": label,
+                "value": value,
+                "percent": round(value * 100, 2),
+            }
+        )
+
+    contributors = []
+    for item in data.get("top_contributors") or []:
+        if not isinstance(item, dict):
+            continue
+        contributors.append(
+            {
+                "feature": str(item.get("feature", "")),
+                "importance": item.get("importance"),
+                "value": item.get("value"),
+            }
+        )
+
+    alerts = [str(a) for a in (data.get("alerts") or []) if a]
+
+    return {
+        "risk_level": risk,
+        "risk_display": TRIAGE_RISK_DISPLAY.get(risk, risk.capitalize() or "Sin clase"),
+        "priority": priority,
+        "priority_display": TRIAGE_PRIORITY_DISPLAY.get(priority, priority.capitalize() or "-"),
+        "confidence": confidence_pct,
+        "probability_rows": probability_rows,
+        "top_contributors": contributors,
+        "alerts": alerts,
+        "model_name": data.get("model_name"),
+        "model_version": data.get("model_version"),
+        "model_family": data.get("model_family"),
+        "score": data.get("score"),
+        "triage_id": data.get("triage_id"),
+        "clinical_note": data.get("clinical_note"),
+    }
+
+
+def empty_triage_form_values() -> dict:
+    values = {key: "" for key, _l, _d, _u, _mn, _mx in TRIAGE_VITAL_FIELDS}
+    values["symptoms"] = []
+    return values
+
+
 def get_default_dashboard_data() -> dict[str, object]:
     return {
         "backend_status": "no disponible",
@@ -346,6 +502,8 @@ def get_default_dashboard_data() -> dict[str, object]:
         },
         "recent_studies": [],
         "quality_events": [],
+        "recent_triages": [],
+        "triage_model": {"loaded": False, "reason": "sin datos"},
     }
 
 
@@ -364,6 +522,10 @@ def fetch_dashboard_data() -> dict[str, object]:
     health = backend_get("/health", {})
     if isinstance(health, dict):
         data["backend_status"] = health.get("status", "no disponible")
+        services = health.get("services") if isinstance(health.get("services"), dict) else {}
+        tm = services.get("triage_model") if isinstance(services, dict) else None
+        if isinstance(tm, dict):
+            data["triage_model"] = tm
 
     metrics = backend_get("/metrics", None)
     if isinstance(metrics, dict):
@@ -376,6 +538,10 @@ def fetch_dashboard_data() -> dict[str, object]:
     events = backend_get("/quality/events?limit=6", {})
     if isinstance(events, dict) and isinstance(events.get("items"), list):
         data["quality_events"] = events["items"]
+
+    triages = backend_get("/triage/history?limit=6", {})
+    if isinstance(triages, dict) and isinstance(triages.get("items"), list):
+        data["recent_triages"] = triages["items"]
 
     return data
 
@@ -438,9 +604,15 @@ def build_template_context(
     study_id=None,
     report_object_key=None,
     dashboard_data=None,
+    triage_result=None,
+    triage_form_values=None,
+    triage_error=None,
+    triage_success=None,
+    default_tab=None,
 ):
     has_image = bool(image_preview)
     has_result = bool(prediction_class)
+    has_triage = bool(triage_result)
     result = build_result_context(prediction_class)
     dashboard_data = dashboard_data or fetch_dashboard_data()
 
@@ -450,6 +622,14 @@ def build_template_context(
         file_status = f"{uploaded_size} - Listo para procesar"
     else:
         file_status = "Seleccione una radiografia JPG, JPEG o PNG"
+
+    if default_tab is None:
+        if has_triage:
+            default_tab = "triage"
+        elif has_result:
+            default_tab = "report"
+        else:
+            default_tab = "study"
 
     return {
         "error": error,
@@ -465,6 +645,7 @@ def build_template_context(
         "file_status": file_status,
         "has_image": has_image,
         "has_result": has_result,
+        "has_triage": has_triage,
         "result": result,
         "minio_bucket_name": MINIO_BUCKET_NAME,
         "minio_console_url": MINIO_CONSOLE_URL,
@@ -473,6 +654,15 @@ def build_template_context(
         "dashboard_metrics": dashboard_data["metrics"],
         "recent_studies": dashboard_data["recent_studies"],
         "quality_events": dashboard_data["quality_events"],
+        "recent_triages": dashboard_data.get("recent_triages", []),
+        "triage_model_status": dashboard_data.get("triage_model", {}),
+        "triage_result": triage_result,
+        "triage_form_values": triage_form_values or empty_triage_form_values(),
+        "triage_error": triage_error,
+        "triage_success": triage_success,
+        "triage_symptoms_catalog": TRIAGE_SYMPTOMS,
+        "triage_vital_fields": TRIAGE_VITAL_FIELDS,
+        "default_tab": default_tab,
     }
 
 
@@ -519,6 +709,62 @@ def logout():
 @app.get("/")
 def index():
     return render_template("index.html", **build_template_context())
+
+
+@app.get("/triage")
+def triage_page():
+    return render_template(
+        "index.html",
+        **build_template_context(default_tab="triage"),
+    )
+
+
+@app.post("/triage")
+def triage_submit():
+    try:
+        payload, raw_values = parse_triage_form(request.form)
+    except ValidationError as exc:
+        return (
+            render_template(
+                "index.html",
+                **build_template_context(
+                    triage_error=str(exc),
+                    triage_form_values={**empty_triage_form_values(), **dict(request.form)},
+                    default_tab="triage",
+                ),
+            ),
+            400,
+        )
+
+    try:
+        backend_response = request_triage(payload)
+    except RuntimeError as exc:
+        return (
+            render_template(
+                "index.html",
+                **build_template_context(
+                    triage_error=str(exc),
+                    triage_form_values=raw_values,
+                    default_tab="triage",
+                ),
+            ),
+            502,
+        )
+
+    assessment = backend_response.get("patient_assessment") or backend_response.get("assessment") or {}
+    triage_view = build_triage_result(assessment)
+    triage_view["triage_id"] = backend_response.get("triage_id")
+    triage_view["storage"] = backend_response.get("storage")
+
+    return render_template(
+        "index.html",
+        **build_template_context(
+            triage_result=triage_view,
+            triage_form_values=raw_values,
+            triage_success="Triaje evaluado correctamente.",
+            default_tab="triage",
+        ),
+    )
 
 
 @app.post("/upload")

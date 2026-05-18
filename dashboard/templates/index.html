@@ -39,6 +39,11 @@
             <span class="material-symbols-outlined">upload_file</span>
             <span class="nav-label">Nuevo estudio</span>
           </button>
+          <button class="tab-button nav-item" role="tab" data-tab="triage">
+            <span class="material-symbols-outlined">emergency</span>
+            <span class="nav-label">Triaje</span>
+            {% if has_triage %}<span class="nav-badge">Nuevo</span>{% endif %}
+          </button>
           <button class="tab-button nav-item" role="tab" data-tab="report">
             <span class="material-symbols-outlined">fact_check</span>
             <span class="nav-label">Informe</span>
@@ -63,6 +68,13 @@
             <span class="status-dot status-dot--blue"></span>
             <span class="status-key">Bucket</span>
             <span class="status-value">{{ minio_bucket_name }}</span>
+          </div>
+          <div class="status-row">
+            <span class="status-dot {% if triage_model_status.loaded %}status-dot--green{% else %}status-dot--amber{% endif %}"></span>
+            <span class="status-key">Triaje IA</span>
+            <span class="status-value">
+              {% if triage_model_status.loaded %}{{ triage_model_status.model_name or 'modelo activo' }}{% else %}fallback heuristico{% endif %}
+            </span>
           </div>
         </div>
 
@@ -99,8 +111,24 @@
           </div>
         </div>
         {% endif %}
+        {% if triage_error %}
+        <div class="alert-wrap">
+          <div class="alert alert-error">
+            <span class="material-symbols-outlined">error</span>
+            {{ triage_error }}
+          </div>
+        </div>
+        {% endif %}
+        {% if triage_success %}
+        <div class="alert-wrap">
+          <div class="alert alert-success">
+            <span class="material-symbols-outlined">check_circle</span>
+            {{ triage_success }}
+          </div>
+        </div>
+        {% endif %}
 
-        <div class="tabs-panels" data-default-tab="{{ 'report' if has_result else 'study' }}">
+        <div class="tabs-panels" data-default-tab="{{ default_tab }}">
 
           <!-- ══ 01 PANEL ══ -->
           <section class="tab-panel" data-panel="overview" role="tabpanel">
@@ -226,11 +254,11 @@
                 </div>
                 <div class="metric-card metric-card--purple">
                   <div class="metric-card__icon">
-                    <span class="material-symbols-outlined">hub</span>
+                    <span class="material-symbols-outlined">emergency</span>
                   </div>
                   <div>
-                    <span class="metric-card__val" style="font-size:16px;letter-spacing:0">{{ backend_status }}</span>
-                    <span class="metric-card__lbl">Estado backend</span>
+                    <span class="metric-card__val" data-counter="{{ dashboard_metrics.triage.total_records }}">{{ dashboard_metrics.triage.total_records }}</span>
+                    <span class="metric-card__lbl">Triajes evaluados</span>
                   </div>
                 </div>
               </div>
@@ -344,6 +372,30 @@
                 </div>
               </div>
 
+              <!-- Triajes recientes -->
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <span class="card-eyebrow">Modelo tabular</span>
+                    <h3>Triajes recientes</h3>
+                  </div>
+                  <div class="card-icon"><span class="material-symbols-outlined">emergency</span></div>
+                </div>
+                <div class="history-list">
+                  {% for record in recent_triages %}
+                  <div class="history-row">
+                    <div>
+                      <strong class="triage-pill triage-pill--{{ record.risk_level }}">{{ record.risk_level|capitalize }}</strong>
+                      <p>Prioridad: {{ record.recommended_priority }} &middot; <code>{{ record.triage_id[:8] }}</code></p>
+                    </div>
+                    <span class="history-conf">{{ "%.0f"|format((record.confidence or 0) * 100) }}%</span>
+                  </div>
+                  {% else %}
+                  <p class="empty-state">Sin triajes evaluados aun.</p>
+                  {% endfor %}
+                </div>
+              </div>
+
             </div>
           </section>
 
@@ -442,6 +494,169 @@
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ══ TRIAJE TABULAR ══ -->
+          <section class="tab-panel" data-panel="triage" role="tabpanel">
+            <div class="panel-body">
+              <div class="section-heading">
+                <h2>Triaje de urgencias</h2>
+                <p>Modelo tabular Random Forest calibrado — clasifica el nivel de urgencia a partir de constantes vitales y sintomas. Apoyo a la decision clinica, no sustituye al personal sanitario.</p>
+              </div>
+
+              <div class="triage-layout">
+                <div class="card">
+                  <div class="card-header">
+                    <div>
+                      <span class="card-eyebrow">Datos del paciente</span>
+                      <h3>Evaluacion clinica</h3>
+                    </div>
+                    <div class="card-icon"><span class="material-symbols-outlined">monitor_heart</span></div>
+                  </div>
+
+                  <form class="triage-form" action="{{ url_for('triage_submit') }}" method="post">
+                    <div class="triage-vitals-grid">
+                      {% for key, label, default, unit, vmin, vmax in triage_vital_fields %}
+                      <label class="triage-field">
+                        <span class="triage-field__label">{{ label }} <small>({{ unit }})</small></span>
+                        <input
+                          class="triage-input"
+                          type="number"
+                          step="any"
+                          name="{{ key }}"
+                          min="{{ vmin }}"
+                          max="{{ vmax }}"
+                          placeholder="{{ default }}"
+                          value="{{ triage_form_values.get(key, '') }}"
+                        />
+                      </label>
+                      {% endfor %}
+                    </div>
+
+                    <div class="triage-symptoms">
+                      <span class="triage-field__label">Sintomas observados</span>
+                      <div class="triage-symptoms-grid">
+                        {% for value, display in triage_symptoms_catalog %}
+                        <label class="triage-chip">
+                          <input
+                            type="checkbox"
+                            name="symptoms"
+                            value="{{ value }}"
+                            {% if value in triage_form_values.get('symptoms', []) %}checked{% endif %}
+                          />
+                          <span>{{ display }}</span>
+                        </label>
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                    <button class="btn-primary" type="submit">
+                      <span class="material-symbols-outlined">stethoscope</span>
+                      Evaluar triaje
+                    </button>
+                  </form>
+                </div>
+
+                {% if triage_result %}
+                <div class="card triage-result-card">
+                  <div class="card-header">
+                    <div>
+                      <span class="card-eyebrow">Resultado del modelo</span>
+                      <h3>Nivel de urgencia</h3>
+                    </div>
+                    <div class="card-icon"><span class="material-symbols-outlined">crisis_alert</span></div>
+                  </div>
+
+                  <div class="triage-banner triage-banner--{{ triage_result.risk_level }}">
+                    <div class="triage-banner__main">
+                      <span class="triage-banner__eyebrow">Riesgo</span>
+                      <span class="triage-banner__title">{{ triage_result.risk_display }}</span>
+                      <span class="triage-banner__sub">Prioridad: {{ triage_result.priority_display }}</span>
+                    </div>
+                    <div class="triage-banner__metrics">
+                      <div>
+                        <span class="triage-metric__val">{{ "%.1f"|format(triage_result.confidence) }}%</span>
+                        <span class="triage-metric__lbl">Confianza</span>
+                      </div>
+                      {% if triage_result.score is not none %}
+                      <div>
+                        <span class="triage-metric__val">{{ triage_result.score }}</span>
+                        <span class="triage-metric__lbl">Score</span>
+                      </div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="triage-section">
+                    <span class="card-eyebrow">Distribucion de riesgo</span>
+                    <div class="probability-list">
+                      {% for row in triage_result.probability_rows %}
+                      <div class="probability-row">
+                        <div class="probability-head">
+                          <span>{{ row.display }}</span>
+                          <span class="probability-pct">{{ "%.0f"|format(row.percent) }}%</span>
+                        </div>
+                        <div class="prob-track">
+                          <span
+                            class="prob-fill prob-fill-risk-{{ row.tone }}"
+                            data-progress="{{ '%.2f'|format(row.percent) }}"
+                            style="width: {{ '%.2f'|format(row.percent) }}%"
+                          ></span>
+                        </div>
+                      </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+
+                  {% if triage_result.top_contributors %}
+                  <div class="triage-section">
+                    <span class="card-eyebrow">Variables mas influyentes</span>
+                    <ul class="triage-contributors">
+                      {% for item in triage_result.top_contributors %}
+                      <li>
+                        <code>{{ item.feature }}</code>
+                        <span class="triage-contrib-val">valor {{ item.value }}</span>
+                        <span class="triage-contrib-imp">peso {{ item.importance }}</span>
+                      </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                  {% endif %}
+
+                  {% if triage_result.alerts %}
+                  <div class="triage-section triage-alerts">
+                    {% for alert in triage_result.alerts %}
+                    <div class="triage-alert">
+                      <span class="material-symbols-outlined">priority_high</span>
+                      <span>{{ alert }}</span>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  {% endif %}
+
+                  <div class="triage-footer">
+                    <span><strong>Modelo:</strong> {{ triage_result.model_name or 'n/a' }}{% if triage_result.model_version %} v{{ triage_result.model_version }}{% endif %}</span>
+                    {% if triage_result.triage_id %}<span><strong>ID:</strong> <code>{{ triage_result.triage_id }}</code></span>{% endif %}
+                    {% if triage_result.clinical_note %}<p class="triage-disclaimer">{{ triage_result.clinical_note }}</p>{% endif %}
+                  </div>
+                </div>
+                {% else %}
+                <div class="card triage-placeholder-card">
+                  <div class="card-header">
+                    <div>
+                      <span class="card-eyebrow">Resultado</span>
+                      <h3>Esperando evaluacion</h3>
+                    </div>
+                    <div class="card-icon"><span class="material-symbols-outlined">pending</span></div>
+                  </div>
+                  <div class="triage-placeholder">
+                    <span class="material-symbols-outlined">health_metrics</span>
+                    <p>Introduzca constantes y sintomas, y pulse <strong>Evaluar triaje</strong> para obtener el nivel de urgencia, probabilidades por clase y variables que mas han influido en la decision.</p>
+                  </div>
+                </div>
+                {% endif %}
               </div>
             </div>
           </section>
