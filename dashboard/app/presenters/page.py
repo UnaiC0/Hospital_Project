@@ -29,7 +29,7 @@ class PageInputs:
     triage_form_values: dict | None = None
     triage_error: str | None = None
     triage_success: str | None = None
-    default_tab: str = "radiology"
+    default_tab: str = "overview"
 
 
 class PagePresenter:
@@ -78,7 +78,11 @@ class PagePresenter:
             "triage_symptoms_catalog": TRIAGE_SYMPTOMS,
             "triage_vital_fields": TRIAGE_VITAL_FIELDS,
             "has_triage": bool(inputs.triage_result),
-            "default_tab": inputs.default_tab if not inputs.triage_result else "triage",
+            "default_tab": (
+                "triage" if inputs.triage_result
+                else "report" if has_result
+                else inputs.default_tab
+            ),
         }
 
     @staticmethod

@@ -6,3 +6,6 @@ psycopg-pool>=3.2,<4.0
 python-multipart>=0.0.9,<1.0
 pillow>=10.3,<12.0
 prometheus-client>=0.20,<1.0
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.2,<3.0
+torchvision>=0.17,<1.0

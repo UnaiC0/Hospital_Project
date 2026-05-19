@@ -1,0 +1,211 @@
+{
+  "model": "radiology-cnn-resnet18",
+  "version": "0.2.0",
+  "classes": [
+    "COVID-19",
+    "Sana",
+    "Neumonia"
+  ],
+  "folder_mapping": {
+    "COVID19": "COVID-19",
+    "NORMAL": "Sana",
+    "PNEUMONIA": "Neumonia"
+  },
+  "device": "cuda",
+  "epochs": 5,
+  "batch_size": 16,
+  "learning_rate": 0.0005,
+  "pretrained": false,
+  "val_split": 0.2,
+  "seed": 42,
+  "class_weights": [
+    3.7273550033569336,
+    1.354063868522644,
+    0.5017068982124329
+  ],
+  "split_counts": {
+    "train": {
+      "COVID-19": 368,
+      "Sana": 1013,
+      "Neumonia": 2734
+    },
+    "val": {
+      "COVID-19": 92,
+      "Sana": 253,
+      "Neumonia": 684
+    },
+    "test": {
+      "COVID-19": 116,
+      "Sana": 317,
+      "Neumonia": 855
+    }
+  },
+  "duration_seconds": 1055.15,
+  "best_validation_accuracy": 0.9504373177842566,
+  "history": [
+    {
+      "epoch": 1,
+      "train": {
+        "loss": 0.40210934108437774,
+        "accuracy": 0.823086269744836
+      },
+      "val": {
+        "loss": 0.22113753368659894,
+        "accuracy": 0.9154518950437318
+      }
+    },
+    {
+      "epoch": 2,
+      "train": {
+        "loss": 0.2897975420133456,
+        "accuracy": 0.8765492102065614
+      },
+      "val": {
+        "loss": 0.3208968518310895,
+        "accuracy": 0.8649173955296404
+      }
+    },
+    {
+      "epoch": 3,
+      "train": {
+        "loss": 0.22647668962635073,
+        "accuracy": 0.9027946537059538
+      },
+      "val": {
+        "loss": 0.20014589124217094,
+        "accuracy": 0.9300291545189504
+      }
+    },
+    {
+      "epoch": 4,
+      "train": {
+        "loss": 0.20592160804665682,
+        "accuracy": 0.909599027946537
+      },
+      "val": {
+        "loss": 0.2744581899791232,
+        "accuracy": 0.8940719144800777
+      }
+    },
+    {
+      "epoch": 5,
+      "train": {
+        "loss": 0.21407574377999272,
+        "accuracy": 0.907411907654921
+      },
+      "val": {
+        "loss": 0.14701386596880803,
+        "accuracy": 0.9504373177842566
+      }
+    }
+  ],
+  "validation_final": {
+    "loss": 0.14701386596880803,
+    "accuracy": 0.9504373177842566,
+    "classification_report": {
+      "COVID-19": {
+        "precision": 0.898989898989899,
+        "recall": 0.967391304347826,
+        "f1-score": 0.9319371727748691,
+        "support": 92.0
+      },
+      "Sana": {
+        "precision": 0.9011406844106464,
+        "recall": 0.9367588932806324,
+        "f1-score": 0.9186046511627907,
+        "support": 253.0
+      },
+      "Neumonia": {
+        "precision": 0.9775112443778111,
+        "recall": 0.9532163742690059,
+        "f1-score": 0.9652109548482606,
+        "support": 684.0
+      },
+      "accuracy": 0.9504373177842566,
+      "macro avg": {
+        "precision": 0.9258806092594521,
+        "recall": 0.9524555239658214,
+        "f1-score": 0.9385842595953067,
+        "support": 1029.0
+      },
+      "weighted avg": {
+        "precision": 0.9517136589090253,
+        "recall": 0.9504373177842566,
+        "f1-score": 0.9507769579744259,
+        "support": 1029.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        89,
+        1,
+        2
+      ],
+      [
+        3,
+        237,
+        13
+      ],
+      [
+        7,
+        25,
+        652
+      ]
+    ]
+  },
+  "test_final": {
+    "loss": 0.167916626050513,
+    "accuracy": 0.9394409937888198,
+    "classification_report": {
+      "COVID-19": {
+        "precision": 0.957983193277311,
+        "recall": 0.9827586206896551,
+        "f1-score": 0.9702127659574468,
+        "support": 116.0
+      },
+      "Sana": {
+        "precision": 0.8644578313253012,
+        "recall": 0.9053627760252366,
+        "f1-score": 0.884437596302003,
+        "support": 317.0
+      },
+      "Neumonia": {
+        "precision": 0.966547192353644,
+        "recall": 0.9461988304093567,
+        "f1-score": 0.9562647754137116,
+        "support": 855.0
+      },
+      "accuracy": 0.9394409937888198,
+      "macro avg": {
+        "precision": 0.9296627389854187,
+        "recall": 0.944773409041416,
+        "f1-score": 0.9369717125577205,
+        "support": 1288.0
+      },
+      "weighted avg": {
+        "precision": 0.9406498698856012,
+        "recall": 0.9394409937888198,
+        "f1-score": 0.9398429983365857,
+        "support": 1288.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        114,
+        2,
+        0
+      ],
+      [
+        2,
+        287,
+        28
+      ],
+      [
+        3,
+        43,
+        809
+      ]
+    ]
+  },
+  "clinical_reading_hint": "Revisar especialmente falsos negativos de COVID-19 y confusiones COVID-19/Neumonia."
+}

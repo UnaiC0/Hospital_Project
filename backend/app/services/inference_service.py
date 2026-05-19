@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import os
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
+import torch
 from PIL import Image, ImageStat
+from torch import nn
+from torchvision import models, transforms
 
 
 CLINICAL_EXPLANATIONS = {
@@ -17,23 +22,42 @@ CLINICAL_NOTE = (
     "debe utilizarse como diagnostico autonomo."
 )
 
+DEFAULT_MODEL_DIR = Path(os.getenv("MODEL_DIR", "/models"))
+DEFAULT_MODEL_FILE = os.getenv("RADIOLOGY_MODEL_FILE", "radiology_cnn_resnet18.pt")
+
 
 class InferenceService:
-    """Baseline inference engine based on grayscale intensity statistics.
+    """ResNet18 inference for chest radiographs.
 
-    This is a placeholder for the CNN model. The contract is the only thing other
-    layers depend on, so swapping in a trained model is a single-file change.
+    Loads the checkpoint produced by ml/train_cnn.py once and reuses it for every
+    request. The checkpoint carries its own class_names and preprocessing contract
+    so the service stays consistent with whatever the trainer produced.
     """
 
-    model_name = "radiology-baseline-image-statistics"
-    model_version = "0.2.0"
-    model_family = "baseline_pre_deep_learning"
+    model_family = "resnet18"
+
+    def __init__(
+        self,
+        model: nn.Module,
+        class_names: list[str],
+        preprocessing: dict[str, Any],
+        model_name: str,
+        model_version: str,
+        device: torch.device,
+    ):
+        self._model = model
+        self._class_names = class_names
+        self._preprocessing = preprocessing
+        self._device = device
+        self.model_name = model_name
+        self.model_version = model_version
+        self._transform = _build_transform(preprocessing)
 
     def predict(self, image_bytes: bytes) -> dict[str, Any]:
-        mean_intensity, contrast = self._compute_features(image_bytes)
-        probabilities = self._compute_probabilities(mean_intensity, contrast)
+        probabilities = self._infer(image_bytes)
         predicted_class = max(probabilities, key=probabilities.get)
         confidence = probabilities[predicted_class]
+        mean_intensity, contrast = self._compute_features(image_bytes)
         quality_flags = self._compute_quality_flags(mean_intensity, contrast, confidence)
 
         return {
@@ -48,14 +72,22 @@ class InferenceService:
                 "contrast": round(contrast, 2),
                 "input_size_bytes": len(image_bytes),
             },
-            "preprocessing": {
-                "color_space": "grayscale",
-                "resize": [256, 256],
-                "normalization": "statistical_baseline",
-            },
+            "preprocessing": self._preprocessing,
             "quality_flags": quality_flags,
-            "explanation": CLINICAL_EXPLANATIONS[predicted_class],
+            "explanation": CLINICAL_EXPLANATIONS.get(predicted_class, ""),
             "clinical_note": CLINICAL_NOTE,
+        }
+
+    def _infer(self, image_bytes: bytes) -> dict[str, float]:
+        with Image.open(BytesIO(image_bytes)) as image:
+            rgb = image.convert("RGB")
+            tensor = self._transform(rgb).unsqueeze(0).to(self._device)
+        with torch.no_grad():
+            logits = self._model(tensor)
+            probs = torch.softmax(logits, dim=1).squeeze(0).cpu().tolist()
+        return {
+            label: round(float(prob), 4)
+            for label, prob in zip(self._class_names, probs)
         }
 
     @staticmethod
@@ -64,25 +96,6 @@ class InferenceService:
             grayscale = image.convert("L").resize((256, 256))
             stats = ImageStat.Stat(grayscale)
         return float(stats.mean[0]), float(stats.stddev[0])
-
-    @staticmethod
-    def _compute_probabilities(mean_intensity: float, contrast: float) -> dict[str, float]:
-        raw_scores = {
-            "Sana": max(
-                0.05,
-                1.45 - abs(mean_intensity - 185.0) / 115.0 - abs(contrast - 42.0) / 65.0,
-            ),
-            "Neumonia": max(
-                0.05,
-                1.20 - abs(mean_intensity - 125.0) / 95.0 + contrast / 135.0,
-            ),
-            "COVID-19": max(
-                0.05,
-                1.15 - abs(mean_intensity - 95.0) / 90.0 + max(0.0, 55.0 - contrast) / 90.0,
-            ),
-        }
-        total = sum(raw_scores.values())
-        return {label: round(score / total, 4) for label, score in raw_scores.items()}
 
     @staticmethod
     def _compute_quality_flags(mean_intensity: float, contrast: float, confidence: float) -> list[str]:
@@ -98,5 +111,55 @@ class InferenceService:
         return flags
 
 
+def _build_transform(preprocessing: dict[str, Any]):
+    size = preprocessing.get("input", {}).get("size") or preprocessing.get("size") or [224, 224]
+    mean = (
+        preprocessing.get("input", {}).get("normalization_mean")
+        or preprocessing.get("normalization_mean")
+        or [0.485, 0.456, 0.406]
+    )
+    std = (
+        preprocessing.get("input", {}).get("normalization_std")
+        or preprocessing.get("normalization_std")
+        or [0.229, 0.224, 0.225]
+    )
+    return transforms.Compose(
+        [
+            transforms.Resize((int(size[0]), int(size[1]))),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean, std=std),
+        ]
+    )
+
+
 def build_inference_service() -> InferenceService:
-    return InferenceService()
+    model_path = DEFAULT_MODEL_DIR / DEFAULT_MODEL_FILE
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Checkpoint no encontrado en {model_path}. "
+            "Entrena el modelo (profile training) o ajusta MODEL_DIR/RADIOLOGY_MODEL_FILE."
+        )
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+
+    class_names = list(checkpoint["class_names"])
+    state_dict = checkpoint["state_dict"]
+    preprocessing = checkpoint.get("preprocessing", {})
+    model_name = str(checkpoint.get("model_name", "radiology-cnn-resnet18"))
+    model_version = str(checkpoint.get("model_version", "0.0.0"))
+
+    model = models.resnet18(weights=None)
+    model.fc = nn.Linear(model.fc.in_features, len(class_names))
+    model.load_state_dict(state_dict)
+    model.to(device)
+    model.eval()
+
+    return InferenceService(
+        model=model,
+        class_names=class_names,
+        preprocessing=preprocessing,
+        model_name=model_name,
+        model_version=model_version,
+        device=device,
+    )
