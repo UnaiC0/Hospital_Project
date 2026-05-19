@@ -143,6 +143,8 @@ def triage_submit():
     )
     triage_view = build_triage_result(assessment)
     triage_view["triage_id"] = backend_response.get("triage_id")
+    triage_view["patient_id"] = backend_response.get("patient_id")
+    triage_view["patient_name"] = backend_response.get("patient_name")
     triage_view["storage"] = backend_response.get("storage")
 
     context = _presenter().build_context(

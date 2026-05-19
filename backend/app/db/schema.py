@@ -12,6 +12,8 @@ SCHEMA_DDL = """
 CREATE TABLE IF NOT EXISTS triage_records (
     id TEXT PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL,
+    patient_id TEXT NOT NULL DEFAULT '',
+    patient_name TEXT NOT NULL DEFAULT '',
     request_payload JSONB NOT NULL,
     model_response JSONB NOT NULL,
     risk_level TEXT NOT NULL,
@@ -21,6 +23,9 @@ CREATE TABLE IF NOT EXISTS triage_records (
     report_bucket TEXT NOT NULL,
     report_object_key TEXT NOT NULL
 );
+
+ALTER TABLE triage_records ADD COLUMN IF NOT EXISTS patient_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE triage_records ADD COLUMN IF NOT EXISTS patient_name TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS triage_records_created_at_idx
 ON triage_records (created_at DESC);

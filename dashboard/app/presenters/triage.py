@@ -64,5 +64,7 @@ def build_triage_result(data: dict) -> dict:
         "model_family": data.get("model_family"),
         "score": data.get("score"),
         "triage_id": data.get("triage_id"),
+        "patient_id": data.get("patient_id"),
+        "patient_name": data.get("patient_name"),
         "clinical_note": data.get("clinical_note"),
     }

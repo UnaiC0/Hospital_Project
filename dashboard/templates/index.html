@@ -517,6 +517,19 @@
                   </div>
 
                   <form class="triage-form" action="{{ url_for('main.triage_submit') }}" method="post">
+                    <label class="triage-field triage-field--full">
+                      <span class="triage-field__label">Nombre del paciente</span>
+                      <input
+                        class="triage-input"
+                        type="text"
+                        name="patient_name"
+                        placeholder="Apellidos, Nombre"
+                        maxlength="200"
+                        required
+                        value="{{ triage_form_values.get('patient_name', '') }}"
+                      />
+                    </label>
+
                     <div class="triage-vitals-grid">
                       {% for key, label, default, unit, vmin, vmax in triage_vital_fields %}
                       <label class="triage-field">
@@ -637,8 +650,10 @@
                   {% endif %}
 
                   <div class="triage-footer">
+                    {% if triage_result.patient_name %}<span><strong>Paciente:</strong> {{ triage_result.patient_name }}</span>{% endif %}
+                    {% if triage_result.patient_id %}<span><strong>ID paciente:</strong> <code>{{ triage_result.patient_id }}</code></span>{% endif %}
                     <span><strong>Modelo:</strong> {{ triage_result.model_name or 'n/a' }}{% if triage_result.model_version %} v{{ triage_result.model_version }}{% endif %}</span>
-                    {% if triage_result.triage_id %}<span><strong>ID:</strong> <code>{{ triage_result.triage_id }}</code></span>{% endif %}
+                    {% if triage_result.triage_id %}<span><strong>ID triaje:</strong> <code>{{ triage_result.triage_id }}</code></span>{% endif %}
                     {% if triage_result.clinical_note %}<p class="triage-disclaimer">{{ triage_result.clinical_note }}</p>{% endif %}
                   </div>
                 </div>
