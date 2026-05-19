@@ -104,6 +104,8 @@ class TestGetReport:
         fake_storage.objects["triage-reports/t-1.json"] = ({"hello": "world"}, "application/json")
         fake_db.cursor.queue_one({
             "id": "t-1",
+            "patient_id": "PAC-00000001",
+            "patient_name": "Test Patient",
             "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
             "request_payload": {},
             "model_response": {},

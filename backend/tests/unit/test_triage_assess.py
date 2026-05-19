@@ -25,7 +25,7 @@ class TestRiskBuckets:
         assert assessment["risk_level"] in {"medium", "high", "critical"}
 
     def test_low_oxygen_adds_25(self, service):
-        baseline = service.assess(TriageRequest())["score"]
+        baseline = service.assess(TriageRequest(patient_name="Test"))["score"]
         with_low_oxygen = service.assess(
             TriageRequest(patient_name="Test", vitals={"oxygen_saturation": 88})
         )["score"]
@@ -42,6 +42,7 @@ class TestRiskBuckets:
     def test_score_caps_at_100(self, service):
         assessment = service.assess(
             TriageRequest(
+                patient_name="Test",
                 symptoms=[
                     "chest pain",
                     "shortness of breath",
@@ -65,6 +66,7 @@ class TestRiskBuckets:
     def test_critical_bucket(self, service):
         assessment = service.assess(
             TriageRequest(
+                patient_name="Test",
                 symptoms=["chest pain"],
                 vitals={"heart_rate": 130, "oxygen_saturation": 80},
             )
@@ -76,6 +78,7 @@ class TestRiskBuckets:
         # 4 symptoms (32 pts) + tachycardia (15) = 47 → medium (25..49)
         assessment = service.assess(
             TriageRequest(
+                patient_name="Test",
                 symptoms=["fever", "cough", "fatigue", "headache"],
                 vitals={"heart_rate": 130},
             )
@@ -87,6 +90,7 @@ class TestRiskBuckets:
         # Symptoms cap 40 + tachycardia 15 = 55 → high
         assessment = service.assess(
             TriageRequest(
+                patient_name="Test",
                 symptoms=["fever", "cough", "fatigue", "headache", "dizziness"],
                 vitals={"heart_rate": 130},
             )
