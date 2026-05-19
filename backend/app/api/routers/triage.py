@@ -31,6 +31,7 @@ async def triage(
             "minio_bucket": storage_result["report_bucket"],
             "minio_object_key": storage_result["report_object_key"],
         },
+        "events": storage_result.get("events", []),
     }
 
 

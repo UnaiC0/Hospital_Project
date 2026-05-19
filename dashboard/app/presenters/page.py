@@ -29,7 +29,7 @@ class PageInputs:
     triage_form_values: dict | None = None
     triage_error: str | None = None
     triage_success: str | None = None
-    default_tab: str = "radiology"
+    default_tab: str = "overview"
 
 
 class PagePresenter:

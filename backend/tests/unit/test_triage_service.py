@@ -5,13 +5,18 @@ from datetime import datetime, timezone
 import pytest
 
 from app.schemas.triage import TriageRequest
+from app.services.quality_service import QualityService
 from app.services.triage_service import TriageNotFoundError, TriageService
 from tests.helpers.fakes import FakeDatabaseSession, FakeObjectStorage
 
 
 @pytest.fixture
 def service(fake_db: FakeDatabaseSession, fake_storage: FakeObjectStorage) -> TriageService:
-    return TriageService(fake_db, fake_storage)
+    return TriageService(
+        db_session=fake_db,
+        object_storage=fake_storage,
+        quality_service=QualityService(fake_db),
+    )
 
 
 class TestRegister:

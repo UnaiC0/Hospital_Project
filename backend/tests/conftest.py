@@ -66,7 +66,11 @@ def app(fake_db, fake_storage, stub_inference):
     from app.services.triage_service import TriageService
 
     quality_service = QualityService(fake_db)
-    triage_service = TriageService(fake_db, fake_storage)
+    triage_service = TriageService(
+        db_session=fake_db,
+        object_storage=fake_storage,
+        quality_service=quality_service,
+    )
     radiology_service = RadiologyService(
         db_session=fake_db,
         object_storage=fake_storage,

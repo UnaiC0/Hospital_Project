@@ -16,6 +16,11 @@ class DashboardDataService:
         health = self._backend.get("/health", {})
         if isinstance(health, dict):
             data["backend_status"] = health.get("status", "no disponible")
+            services = health.get("services")
+            if isinstance(services, dict):
+                tm = services.get("triage_model")
+                if isinstance(tm, dict):
+                    data["triage_model"] = tm
 
         metrics = self._backend.get("/metrics", None)
         if isinstance(metrics, dict):
@@ -32,13 +37,6 @@ class DashboardDataService:
         triages = self._backend.get("/triage/history?limit=6", {})
         if isinstance(triages, dict) and isinstance(triages.get("items"), list):
             data["recent_triages"] = triages["items"]
-
-        if isinstance(metrics, dict):
-            services = metrics.get("services")
-            if isinstance(services, dict):
-                tm = services.get("triage_model")
-                if isinstance(tm, dict):
-                    data["triage_model"] = tm
 
         return data
 

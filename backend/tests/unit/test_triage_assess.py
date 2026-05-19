@@ -3,13 +3,19 @@ from __future__ import annotations
 import pytest
 
 from app.schemas.triage import TriageRequest
+from app.services.quality_service import QualityService
 from app.services.triage_service import TriageService
 from tests.helpers.fakes import FakeDatabaseSession, FakeObjectStorage
 
 
 @pytest.fixture
 def service() -> TriageService:
-    return TriageService(FakeDatabaseSession(), FakeObjectStorage())
+    db = FakeDatabaseSession()
+    return TriageService(
+        db_session=db,
+        object_storage=FakeObjectStorage(),
+        quality_service=QualityService(db),
+    )
 
 
 class TestRiskBuckets:

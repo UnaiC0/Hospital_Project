@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 
 class HealthServices(BaseModel):
     inference_engine: str
+    triage_model: dict[str, Any] = Field(default_factory=dict)
     postgres: str
     minio: str
     spark: str

@@ -248,42 +248,6 @@ services:
     networks:
       - hospital_network
 
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    container_name: hospital-prometheus
-    restart: always
-    ports:
-      - "127.0.0.1:9090:9090"
-    volumes:
-      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - hospital_network
-
-  grafana:
-    image: grafana/grafana:11.2.0
-    container_name: hospital-grafana
-    restart: always
-    ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_AUTH_ANONYMOUS_ENABLED: "false"
-    volumes:
-      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      prometheus:
-        condition: service_started
-    networks:
-      - hospital_network
-
 networks:
   hospital_network:
     name: hospital_network
@@ -292,5 +256,3 @@ networks:
 volumes:
   postgres_data:
   minio_data:
-  prometheus_data:
-  grafana_data:

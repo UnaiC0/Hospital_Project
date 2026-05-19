@@ -35,7 +35,11 @@ def get_quality_service() -> QualityService:
 
 @lru_cache(maxsize=1)
 def get_triage_service() -> TriageService:
-    return TriageService(get_database_session(), get_object_storage())
+    return TriageService(
+        db_session=get_database_session(),
+        object_storage=get_object_storage(),
+        quality_service=get_quality_service(),
+    )
 
 
 @lru_cache(maxsize=1)

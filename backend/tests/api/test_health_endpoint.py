@@ -12,7 +12,7 @@ def test_health_returns_200_with_status(client):
     assert "status" in body
     assert "services" in body
     assert "storage" in body
-    assert set(body["services"]) == {"inference_engine", "postgres", "minio", "spark"}
+    assert set(body["services"]) == {"inference_engine", "triage_model", "postgres", "minio", "spark"}
 
 
 def test_health_ok_with_fakes(client):

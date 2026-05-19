@@ -75,6 +75,7 @@ def upload():
                 uploaded_size=uploaded_size,
                 study_id=prediction.get("study_id"),
                 report_object_key=prediction.get("storage", {}).get("report_object_key"),
+                default_tab="report",
             )
         )
         return render_template("index.html", **context)
@@ -104,6 +105,7 @@ def _render_error(message, status_code, image_preview, filename, size):
             image_preview=image_preview,
             uploaded_filename=filename,
             uploaded_size=size,
+            default_tab="study",
         )
     )
     return render_template("index.html", **context), status_code
