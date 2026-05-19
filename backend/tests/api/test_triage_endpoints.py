@@ -9,17 +9,20 @@ pytestmark = pytest.mark.api
 
 class TestTriageCreate:
     def test_minimal_payload_returns_200(self, client):
-        response = client.post("/triage", json={})
+        response = client.post("/triage", json={"patient_name": "Test"})
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "accepted"
         assert body["triage_id"]
+        assert body["patient_id"]
+        assert body["patient_name"] == "Test"
         assert body["patient_assessment"]["risk_level"] == "low"
 
     def test_critical_payload_returns_critical_risk(self, client):
         response = client.post(
             "/triage",
             json={
+                "patient_name": "Test",
                 "symptoms": ["chest pain"],
                 "vitals": {"heart_rate": 130, "oxygen_saturation": 80, "systolic_bp": 80},
             },
@@ -30,7 +33,7 @@ class TestTriageCreate:
         assert body["patient_assessment"]["recommended_priority"] == "immediate"
 
     def test_storage_info_present(self, client):
-        response = client.post("/triage", json={})
+        response = client.post("/triage", json={"patient_name": "Test"})
         storage = response.json()["storage"]
         assert "postgres_database" in storage
         assert "minio_bucket" in storage
@@ -52,6 +55,8 @@ class TestTriageHistory:
         fake_db.cursor.queue_all([
             {
                 "id": "t-1",
+                "patient_id": "PAC-00000001",
+                "patient_name": "Test Patient",
                 "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
                 "risk_level": "low",
                 "recommended_priority": "standard",
@@ -75,6 +80,8 @@ class TestTriageDetail:
     def test_returns_record(self, client, fake_db):
         fake_db.cursor.queue_one({
             "id": "t-1",
+            "patient_id": "PAC-00000001",
+            "patient_name": "Test Patient",
             "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
             "request_payload": {"symptoms": []},
             "model_response": {"risk_level": "low"},
@@ -101,6 +108,8 @@ class TestTriageReport:
         fake_storage.objects["triage-reports/t-1.json"] = ({"hello": "world"}, "application/json")
         fake_db.cursor.queue_one({
             "id": "t-1",
+            "patient_id": "PAC-00000001",
+            "patient_name": "Test Patient",
             "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
             "request_payload": {},
             "model_response": {},

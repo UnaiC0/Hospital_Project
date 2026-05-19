@@ -14,29 +14,29 @@ def service() -> TriageService:
 
 class TestRiskBuckets:
     def test_empty_payload_is_low_risk(self, service):
-        assessment = service.assess(TriageRequest())
+        assessment = service.assess(TriageRequest(patient_name="Test"))
         assert assessment["risk_level"] == "low"
         assert assessment["recommended_priority"] == "standard"
         assert assessment["score"] == 0
 
     def test_chest_pain_escalates(self, service):
-        assessment = service.assess(TriageRequest(symptoms=["chest pain"]))
+        assessment = service.assess(TriageRequest(patient_name="Test", symptoms=["chest pain"]))
         assert assessment["score"] >= 35
         assert assessment["risk_level"] in {"medium", "high", "critical"}
 
     def test_low_oxygen_adds_25(self, service):
         baseline = service.assess(TriageRequest())["score"]
         with_low_oxygen = service.assess(
-            TriageRequest(vitals={"oxygen_saturation": 88})
+            TriageRequest(patient_name="Test", vitals={"oxygen_saturation": 88})
         )["score"]
         assert with_low_oxygen - baseline == 25
 
     def test_low_blood_pressure_adds_20(self, service):
-        with_low_bp = service.assess(TriageRequest(vitals={"systolic_bp": 80}))["score"]
+        with_low_bp = service.assess(TriageRequest(patient_name="Test", vitals={"systolic_bp": 80}))["score"]
         assert with_low_bp == 20
 
     def test_high_heart_rate_adds_15(self, service):
-        with_hr = service.assess(TriageRequest(vitals={"heart_rate": 130}))["score"]
+        with_hr = service.assess(TriageRequest(patient_name="Test", vitals={"heart_rate": 130}))["score"]
         assert with_hr == 15
 
     def test_score_caps_at_100(self, service):
@@ -58,7 +58,7 @@ class TestRiskBuckets:
 
     def test_symptom_score_caps_at_40(self, service):
         many = service.assess(
-            TriageRequest(symptoms=["fever"] * 20)
+            TriageRequest(patient_name="Test", symptoms=["fever"] * 20)
         )["score"]
         assert many == 8  # de-duplicated to {"fever"} → 8
 
@@ -98,19 +98,19 @@ class TestRiskBuckets:
 class TestVitalsCoercion:
     def test_non_numeric_vitals_fall_back_to_defaults(self, service):
         assessment = service.assess(
-            TriageRequest(vitals={"heart_rate": "abc", "oxygen_saturation": None})
+            TriageRequest(patient_name="Test", vitals={"heart_rate": "abc", "oxygen_saturation": None})
         )
         assert assessment["score"] == 0
 
     def test_empty_string_symptoms_are_filtered(self, service):
-        assessment = service.assess(TriageRequest(symptoms=["", ""]))
+        assessment = service.assess(TriageRequest(patient_name="Test", symptoms=["", ""]))
         assert assessment["score"] == 0
 
 
 class TestConfidence:
     def test_confidence_grows_with_score(self, service):
-        low = service.assess(TriageRequest())
+        low = service.assess(TriageRequest(patient_name="Test"))
         high = service.assess(
-            TriageRequest(symptoms=["chest pain"], vitals={"oxygen_saturation": 80})
+            TriageRequest(patient_name="Test", symptoms=["chest pain"], vitals={"oxygen_saturation": 80})
         )
         assert high["confidence"] > low["confidence"]
