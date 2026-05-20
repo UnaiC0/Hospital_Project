@@ -63,11 +63,14 @@ class TriageService:
         unreferenced; full SAGA compensation would belong in a future iteration).
         """
         record_id = str(uuid4())
+        patient_id = "PAC-" + str(uuid4())[:8].upper()
         created_at = datetime.now(timezone.utc)
         object_key = f"triage-reports/{record_id}.json"
 
         report = {
             "triage_id": record_id,
+            "patient_id": patient_id,
+            "patient_name": request.patient_name,
             "created_at": created_at.isoformat(),
             "request": request.model_dump(),
             "assessment": assessment,
@@ -81,6 +84,8 @@ class TriageService:
                 cursor,
                 record_id=record_id,
                 created_at=created_at,
+                patient_id=patient_id,
+                patient_name=request.patient_name,
                 request_payload=request.model_dump(),
                 model_response=assessment,
                 risk_level=str(assessment.get("risk_level", "unknown")),
@@ -93,6 +98,8 @@ class TriageService:
 
         return {
             "triage_id": record_id,
+            "patient_id": patient_id,
+            "patient_name": request.patient_name,
             "created_at": created_at.isoformat(),
             "report_bucket": self._storage.bucket,
             "report_object_key": object_key,

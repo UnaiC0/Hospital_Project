@@ -24,6 +24,8 @@ async def triage(
     return {
         "status": "accepted",
         "triage_id": storage_result["triage_id"],
+        "patient_id": storage_result["patient_id"],
+        "patient_name": storage_result["patient_name"],
         "created_at": storage_result["created_at"],
         "patient_assessment": assessment,
         "storage": {

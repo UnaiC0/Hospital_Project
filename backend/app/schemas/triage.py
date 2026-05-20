@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class TriageRequest(BaseModel):
+    patient_name: str = Field(min_length=1, max_length=200)
     symptoms: list[str] = Field(default_factory=list)
     vitals: dict[str, Any] = Field(default_factory=dict)
     notes: str | None = None
@@ -28,6 +29,8 @@ class TriageStorageInfo(BaseModel):
 class TriageResponse(BaseModel):
     status: str
     triage_id: str
+    patient_id: str
+    patient_name: str
     created_at: str
     patient_assessment: TriageAssessment
     storage: TriageStorageInfo
@@ -35,6 +38,8 @@ class TriageResponse(BaseModel):
 
 class TriageHistoryItem(BaseModel):
     triage_id: str
+    patient_id: str
+    patient_name: str
     created_at: str
     risk_level: str
     recommended_priority: str

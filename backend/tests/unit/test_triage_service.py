@@ -16,12 +16,14 @@ def service(fake_db: FakeDatabaseSession, fake_storage: FakeObjectStorage) -> Tr
 
 class TestRegister:
     def test_inserts_db_row_and_uploads_report(self, service, fake_db, fake_storage):
-        request = TriageRequest(symptoms=["fever"])
+        request = TriageRequest(patient_name="Test", symptoms=["fever"])
         assessment = service.assess(request)
 
         result = service.register(request, assessment)
 
         assert result["triage_id"]
+        assert result["patient_id"]
+        assert result["patient_name"] == "Test"
         assert result["report_bucket"] == fake_storage.bucket
         assert result["report_object_key"].startswith("triage-reports/")
         assert fake_storage.ensure_bucket_calls >= 1
@@ -30,7 +32,7 @@ class TestRegister:
         assert len(fake_db.cursor.executed) == 1
 
     def test_report_document_contains_request_and_assessment(self, service, fake_storage):
-        request = TriageRequest(symptoms=["chest pain"], notes="patient anxious")
+        request = TriageRequest(patient_name="Test", symptoms=["chest pain"], notes="patient anxious")
         assessment = service.assess(request)
         result = service.register(request, assessment)
 
@@ -45,6 +47,8 @@ class TestListHistory:
         fake_db.cursor.queue_all([
             {
                 "id": "t-1",
+                "patient_id": "PAC-00000001",
+                "patient_name": "Test Patient",
                 "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
                 "risk_level": "low",
                 "recommended_priority": "standard",
@@ -57,6 +61,8 @@ class TestListHistory:
         items = service.list_history(10)
         assert items == [{
             "triage_id": "t-1",
+            "patient_id": "PAC-00000001",
+            "patient_name": "Test Patient",
             "created_at": "2026-01-01T00:00:00+00:00",
             "risk_level": "low",
             "recommended_priority": "standard",
@@ -71,6 +77,8 @@ class TestGet:
     def test_returns_record(self, service, fake_db):
         fake_db.cursor.queue_one({
             "id": "t-1",
+            "patient_id": "PAC-00000001",
+            "patient_name": "Test Patient",
             "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
             "request_payload": {"symptoms": []},
             "model_response": {"risk_level": "low"},
@@ -96,6 +104,8 @@ class TestGetReport:
         fake_storage.objects["triage-reports/t-1.json"] = ({"hello": "world"}, "application/json")
         fake_db.cursor.queue_one({
             "id": "t-1",
+            "patient_id": "PAC-00000001",
+            "patient_name": "Test Patient",
             "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
             "request_payload": {},
             "model_response": {},
