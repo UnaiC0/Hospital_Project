@@ -9,7 +9,10 @@ Thumbs.db
 data/processed/*
 !data/processed/.gitkeep
 data/radiology_dataset/
+data/Data/
 models/*
 !models/.gitkeep
+!models/radiology_cnn_resnet18.pt
+!models/radiology_cnn_metrics.json
 infrastructure/traefik/certs/*
 !infrastructure/traefik/certs/README.md

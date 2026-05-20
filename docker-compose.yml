@@ -26,6 +26,8 @@ services:
       MINIO_BUCKET_NAME: "${MINIO_BUCKET_NAME:?Set MINIO_BUCKET_NAME in .env}"
       MINIO_AUTO_CREATE_BUCKET: ${MINIO_AUTO_CREATE_BUCKET:-true}
       SPARK_MASTER_URL: spark://spark:7077
+      MODEL_DIR: /models
+      RADIOLOGY_MODEL_FILE: ${RADIOLOGY_MODEL_FILE:-radiology_cnn_resnet18.pt}
     volumes:
       - ./models:/models:ro
     depends_on:
@@ -163,15 +165,27 @@ services:
     profiles:
       - training
     environment:
-      DATASET_DIR: /data/radiology_dataset
+      DATASET_DIR: /data/Data
       MODEL_DIR: /models
-      EPOCHS: ${TRAINING_EPOCHS:-5}
-      BATCH_SIZE: ${TRAINING_BATCH_SIZE:-16}
+      EPOCHS: ${TRAINING_EPOCHS:-10}
+      BATCH_SIZE: ${TRAINING_BATCH_SIZE:-8}
       LEARNING_RATE: ${TRAINING_LEARNING_RATE:-0.0005}
-      PRETRAINED: ${TRAINING_PRETRAINED:-false}
+      PRETRAINED: ${TRAINING_PRETRAINED:-true}
+      VAL_SPLIT: ${TRAINING_VAL_SPLIT:-0.2}
+      SEED: ${TRAINING_SEED:-42}
+      NUM_WORKERS: ${TRAINING_NUM_WORKERS:-0}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - ./data:/data
       - ./models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     networks:
       - hospital_network
 

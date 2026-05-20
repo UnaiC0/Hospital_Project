@@ -2,7 +2,12 @@
   "name": "radiology-cnn-resnet18",
   "version": "0.1.0",
   "task": "Clasificacion de radiografias de torax",
-  "labels": ["Sana", "Neumonia", "COVID-19"],
+  "labels": ["COVID-19", "Sana", "Neumonia"],
+  "source_folder_mapping": {
+    "COVID19": "COVID-19",
+    "NORMAL": "Sana",
+    "PNEUMONIA": "Neumonia"
+  },
   "input": {
     "format": "RGB image",
     "size": [224, 224],
