@@ -276,8 +276,6 @@ def build_toc() -> list:
         ("15.", "Consideraciones eticas y legales", False),
         ("16.", "Conclusiones", False),
         ("A.", "Anexo: estructura del repositorio", True),
-        ("B.", "Anexo: variables de entorno", True),
-        ("C.", "Anexo: comandos de ejecucion", True),
     ]
     rendered = [chapter(0, "Indice")]
     for num, title, is_annex in rows:
@@ -318,24 +316,6 @@ def build_ch1_summary() -> list:
             "<b>Modelos IA</b>: Random Forest calibrado (triaje) y ResNet18 (clasificacion radiologica).",
             "<b>Orquestacion</b>: Docker Compose con perfiles (<i>pipeline</i>, <i>training</i>, <i>triage-training</i>).",
             "<b>Tests y CI</b>: pytest con dobles que respetan contratos reales y GitHub Actions.",
-        ]),
-        section("1.3", "Estado de la entrega"),
-        highlight(
-            "El proyecto cumple <b>todos los requisitos minimos del enunciado</b> en su "
-            "alcance tecnico: modelo de IA, pipeline Big Data, dos sistemas de almacenamiento, "
-            "automatizaciones, dashboard, containerizacion con un solo comando, calidad de "
-            "datos, logging y documentacion. Los dos modelos de IA (Random Forest de triaje y "
-            "CNN ResNet18 de radiologia) estan entrenados, persistidos en <i>/models</i> y "
-            "cargados en caliente por el backend al iniciar."
-        ),
-        bullets([
-            "Infraestructura Docker Compose: <b>9 servicios</b> operativos con healthchecks y volumenes persistentes.",
-            "Backend FastAPI modular con <b>5 routers</b> (health, triage, radiology, quality, metrics).",
-            "Dashboard Flask modular con app factory, blueprints de autenticacion y vistas operativas.",
-            "Pipeline Spark modular separando validacion, transformacion, escritura y reporte.",
-            "<b>Dos modelos</b> de IA entrenados y operativos: triaje Random Forest (accuracy 80.6 % sobre 8.000 muestras) y CNN ResNet18 (accuracy 95.04 % en validacion y 93.94 % en test).",
-            "Cobertura de tests amplia: 18 archivos de tests en backend y 6 en dashboard.",
-            "Acceso directo por HTTP a backend (:8000) y dashboard (:8501); HTTPS fuera de alcance del prototipo.",
         ]),
         PageBreak(),
     ]
@@ -406,71 +386,27 @@ def build_ch3_data() -> list:
     out: list = [
         chapter(3, "Datos"),
         section("3.1", "Fuentes de datos"),
-        subsection("Imagenes de radiografias de torax (no estructurado)"),
         p(
-            "Las imagenes son los datos no estructurados centrales del sistema. Se aceptan "
-            "los formatos JPG, JPEG y PNG con un tamano maximo de 5 MB. La validacion se "
-            "realiza en dos niveles: cliente (Flask) y servidor (FastAPI), comprobando "
-            "extension declarada, tipo MIME y contenido binario real mediante Pillow para "
-            "evitar archivos malformados o tipos enganados."
+            "<b>Imagenes radiograficas</b>: JPG/PNG, max 5 MB, validacion en dos niveles "
+            "(extension + MIME + contenido Pillow). Para entrenamiento: "
+            "<b>COVID-19 Radiography Database</b> (Kaggle) en "
+            "<i>data/radiology_dataset/{train,val}/{Sana,Neumonia,COVID-19}/</i>.<br/>"
+            "<b>CSV tabular (pipeline)</b>: <i>data/incoming/radiology_studies.csv</i> con "
+            "columnas obligatorias <i>study_id, patient_age, patient_sex, image_object_key, "
+            "label, acquisition_date, source</i>.<br/>"
+            "<b>Dataset sintetico de triaje</b>: 8.000 muestras con 6 vitales + 10 sintomas "
+            "binarios, etiquetadas segun reglas MEWS/NEWS2 con 6 % de ruido, split 80/20 "
+            "estratificado."
         ),
-        p(
-            "Para entrenamiento del modelo CNN se preve la incorporacion de un dataset "
-            "publico como el <b>COVID-19 Radiography Database</b> (Kaggle, ~21k imagenes) "
-            "siguiendo la estructura de directorios "
-            "<i>data/radiology_dataset/{train,val}/{Sana,Neumonia,COVID-19}/</i>."
-        ),
-        subsection("CSV de estudios radiologicos (tabular, lote)"),
-        p(
-            "El pipeline Spark procesa lotes desde <i>data/incoming/radiology_studies.csv</i> "
-            "con cabecera y las siguientes columnas obligatorias:"
-        ),
+        section("3.2", "Ingesta, limpieza y transformaciones"),
         bullets([
-            "<b>study_id</b>: identificador unico del estudio.",
-            "<b>patient_age</b>: edad del paciente.",
-            "<b>patient_sex</b>: M, F o U.",
-            "<b>image_object_key</b>: clave del objeto en MinIO.",
-            "<b>label</b>: etiqueta clinica (Sana, Neumonia, COVID-19).",
-            "<b>acquisition_date</b>: fecha de adquisicion.",
-            "<b>source</b>: equipo o departamento origen.",
+            "<b>Ingesta</b>: dashboard (imagen individual), API directa (<i>POST /predict</i>), pipeline Spark (lote CSV) y model-trainer (dataset de imagenes).",
+            "<b>Imagenes</b>: extension JPG/JPEG/PNG, tamano &lt;= 5 MB, MIME real vs. declarado, rechazo de JPEG renombrado como PNG.",
+            "<b>CSV</b>: columnas obligatorias, tipos, no nulos, etiquetas validas; duplicados por <i>image_object_key</i> rechazados; rechazados a informe del run.",
+            "<b>Spark</b>: trim de strings, conversion de tipos, columnas derivadas.",
+            "<b>Imagenes (CNN)</b>: resize 224x224, tensor RGB, normalizacion ImageNet (mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225]); augmentation en training: RandomHorizontalFlip + RandomRotation(8°).",
         ]),
-        subsection("Datos sinteticos para entrenamiento de triaje"),
-        p(
-            "El triaje se entrena con un dataset sintetico generado por "
-            "<i>ml/train_triage.py</i>, inspirado en los protocolos <b>MEWS</b> (Modified "
-            "Early Warning Score) y <b>NEWS2</b> (National Early Warning Score 2) utilizados "
-            "en hospitales del Reino Unido y Espana. La generacion incluye:"
-        ),
-        bullets([
-            "8.000 muestras sinteticas con variables continuas (edad, frecuencia cardiaca, saturacion, presion, frecuencia respiratoria, temperatura) y binarias (sintomas).",
-            "Etiquetas calculadas con reglas MEWS/NEWS2 acotadas a cuatro niveles: <i>low</i>, <i>medium</i>, <i>high</i>, <i>critical</i>.",
-            "Ruido de etiquetado del 6 % introducido deliberadamente para forzar generalizacion y evitar memorizacion.",
-            "Division 80/20 entre entrenamiento y test, estratificada por clase.",
-        ]),
-        section("3.2", "Proceso de ingesta"),
-        bullets([
-            "<b>Ingesta desde dashboard</b>: el usuario sube una imagen por formulario HTML; Flask valida en cliente y delega al backend.",
-            "<b>Ingesta desde API</b>: clientes externos pueden invocar <i>POST /predict</i> directamente con la imagen binaria.",
-            "<b>Ingesta de lotes</b>: el pipeline Spark se dispara con <i>docker compose --profile pipeline up pipeline</i> y lee el CSV indicado por <i>PIPELINE_INPUT_PATH</i>.",
-            "<b>Ingesta para entrenamiento</b>: el modulo <i>model-trainer</i> lee imagenes desde la estructura de directorios esperada en <i>data/radiology_dataset/</i>.",
-        ]),
-        section("3.3", "Limpieza y validacion"),
-        p("La validacion se aplica de forma consistente en cada etapa del pipeline:"),
-        bullets([
-            "<b>Imagenes</b>: extension JPG/JPEG/PNG, tamano <= 5 MB, MIME real verificado con Pillow, deteccion de coherencia entre extension y formato real (rechazo de JPEG renombrado como PNG).",
-            "<b>CSV tabular</b>: comprobacion de columnas obligatorias, validacion de tipos, recorte de espacios en blanco, etiquetas validas, no valores nulos en campos clave.",
-            "<b>Detection de duplicados</b>: por <i>image_object_key</i>; ambos duplicados se rechazan.",
-            "<b>Separacion de registros</b>: validos van a <i>data/processed/radiology_clean</i>; rechazados se documentan en el informe del run.",
-            "<b>Eventos de calidad</b>: cualquier rechazo genera un evento de severidad <i>medium</i> en la tabla <i>quality_events</i>; un fallo de pipeline genera evento <i>high</i>.",
-        ]),
-        section("3.4", "Transformaciones aplicadas"),
-        bullets([
-            "<b>Spark</b>: normalizacion de strings (trim), conversion de tipos, calculo de columnas derivadas y particionado del DataFrame para escritura.",
-            "<b>Imagenes (entrenamiento)</b>: resize a 224x224, conversion a tensor, normalizacion con la media y desviacion estandar de ImageNet (<i>mean=[0.485, 0.456, 0.406]</i>, <i>std=[0.229, 0.224, 0.225]</i>).",
-            "<b>Augmentations en training</b>: horizontal flip aleatorio (p=0.5) y rotacion +/-8 grados para reducir overfitting con datasets pequenos.",
-            "<b>Imagenes (inferencia ResNet18)</b>: resize a 224x224, conversion a tensor RGB, normalizacion con la misma media y desviacion utilizadas en entrenamiento (parametros de ImageNet) y forward a traves de la red en modo <i>eval</i>.",
-        ]),
-        section("3.5", "Almacenamiento final"),
+        section("3.3", "Almacenamiento final"),
         table(
             ["Tipo de dato", "Almacenamiento", "Justificacion"],
             [
@@ -523,21 +459,7 @@ def build_ch4_architecture() -> list:
             "  --> Lee dataset de /data/radiology_dataset\n"
             "  --> Persiste artefacto en /models\n"
         ),
-        section("4.2", "Diseno del pipeline de datos"),
-        p(
-            "El pipeline de datos se concibe en cuatro fases claras: <b>ingesta</b>, "
-            "<b>validacion</b>, <b>transformacion</b> y <b>servicio</b>. Cada fase es "
-            "independiente y testeable, y el pipeline Spark esta modularizado en submodulos "
-            "(<i>validators</i>, <i>transforms</i>, <i>writers</i>, <i>reports</i>) para "
-            "facilitar mantenimiento."
-        ),
-        bullets([
-            "<b>Ingesta</b>: dashboard (imagenes individuales), API (clientes externos), pipeline Spark (lotes CSV).",
-            "<b>Validacion</b>: esquema, tipos, integridad, calidad de imagen.",
-            "<b>Transformacion</b>: preprocesamiento de imagen, limpieza tabular, derivacion de campos.",
-            "<b>Servicio</b>: API REST tipada, dashboard web, MinIO API S3.",
-        ]),
-        section("4.3", "Infraestructura containerizada"),
+        section("4.2", "Infraestructura containerizada"),
         subsection("Servicios Docker Compose"),
         table(
             ["Servicio", "Imagen", "Puerto", "Responsabilidad"],
@@ -581,27 +503,6 @@ def build_ch4_architecture() -> list:
             "<b>--profile training</b>: entrena el modelo CNN ResNet18 sobre el dataset radiografico.",
             "<b>--profile triage-training</b>: entrena el Random Forest de triaje.",
         ]),
-        section("4.4", "Relacion entre componentes"),
-        p(
-            "El flujo end-to-end de un estudio radiologico atraviesa cinco fronteras de "
-            "integracion:"
-        ),
-        bullets([
-            "<b>1. Navegador --&gt; Dashboard</b>: HTTP con cookie de sesion firmada (SECRET_KEY), HttpOnly, SameSite=Lax.",
-            "<b>2. Dashboard --&gt; MinIO</b>: subida directa de la imagen a <i>uploads/&lt;uuid&gt;.&lt;ext&gt;</i> mediante boto3.",
-            "<b>3. Dashboard --&gt; Backend</b>: POST <i>/predict</i> con la imagen y la clave de objeto ya conocida.",
-            "<b>4. Backend --&gt; Servicios internos</b>: inferencia, persistencia en PostgreSQL (pool) y en MinIO (informe JSON), todo en una sola transaccion ACID.",
-            "<b>5. Respuesta</b>: el dashboard renderiza resultado, probabilidades, banderas de calidad y enlace al informe.",
-        ]),
-        section("4.5", "Capa de seguridad"),
-        bullets([
-            "<b>Autenticacion local</b>: usuarios admin y doctor con contrasenas hash Werkzeug (PBKDF2-SHA256, 1M iteraciones).",
-            "<b>Roles</b>: admin ve almacenamiento MinIO y todas las metricas; doctor accede a radiologia y resultados.",
-            "<b>Sesiones</b>: cookie firmada con SECRET_KEY de longitud >= 32 bytes; expira al cerrar el navegador.",
-            "<b>Puertos restringidos</b>: todos los puertos publicados estan enlazados a 127.0.0.1, no a 0.0.0.0.",
-            "<b>Variables sensibles</b>: externalizadas en <i>.env</i> con la sintaxis <i>${VAR:?Set VAR in .env}</i> que falla rapido si faltan.",
-            "<b>Credenciales nunca en repositorio</b>: <i>.env</i>, certificados y artefactos sensibles excluidos por <i>.gitignore</i>.",
-        ]),
         PageBreak(),
     ]
     return out
@@ -611,47 +512,14 @@ def build_ch5_models() -> list:
     out: list = [
         chapter(5, "Modelos de Inteligencia Artificial"),
         section("5.1", "Modelo de triaje (Random Forest calibrado)"),
-        subsection("Justificacion de la arquitectura"),
         p(
-            "El triaje clinico opera sobre datos tabulares de baja dimensionalidad (~17 "
-            "variables tras one-hot encoding de sintomas). Para este tipo de problema se "
-            "ha seleccionado un <b>Random Forest</b> con 400 arboles y profundidad maxima "
-            "12, posteriormente <b>calibrado isotonicamente</b> con CalibratedClassifierCV "
-            "para producir probabilidades clinicamente interpretables. La eleccion se "
-            "justifica por:"
+            "El triaje opera sobre ~17 variables (6 vitales continuas + 10 sintomas binarios). "
+            "Se ha elegido un <b>Random Forest con 400 arboles</b> (max_depth=12) con "
+            "<b>calibracion isotonica</b> (CalibratedClassifierCV): ofrece feature importances "
+            "interpretables clinicamente, entrena en CPU en ~16 s y sus probabilidades son "
+            "fiables tras la calibracion. Dataset sintetico de 8.000 muestras generado con "
+            "reglas MEWS/NEWS2, 6 % de ruido de etiquetado y split 80/20 estratificado."
         ),
-        bullets([
-            "<b>Interpretabilidad</b>: feature importances directamente comparables con la intuicion clinica (saturacion y bleeding son las variables top).",
-            "<b>Robustez frente a outliers</b>: caracteristica intrinseca de los ensembles de arboles.",
-            "<b>Sin necesidad de GPU</b>: entrenable en CPU en menos de 20 segundos.",
-            "<b>Buen comportamiento con datasets pequenos</b>: 8.000 muestras son suficientes para generalizar.",
-            "<b>Calibracion isotonica</b>: corrige el sesgo de probabilidades hacia 0.5/1 tipico en RF y produce probabilidades clinicamente fiables.",
-        ]),
-        subsection("Generacion del dataset sintetico"),
-        p(
-            "El script <i>ml/train_triage.py</i> genera 8.000 muestras a partir de reglas "
-            "inspiradas en MEWS y NEWS2. Cada muestra incluye seis variables continuas "
-            "(edad, frecuencia cardiaca, saturacion, presion sistolica, frecuencia "
-            "respiratoria y temperatura) y diez variables binarias correspondientes a "
-            "sintomas frecuentes (dolor toracico, disnea, perdida de conciencia, fiebre, "
-            "tos, dolor abdominal, cefalea, mareo, vomitos, sangrado)."
-        ),
-        p(
-            "Las etiquetas se calculan con un sistema de puntuacion que respeta la "
-            "logica clinica: hipoxia, taquicardia e hipotension contribuyen al score, los "
-            "sintomas red-flag (dolor toracico, disnea, perdida de conciencia, sangrado) "
-            "elevan el riesgo, y el resultado se discretiza en cuatro niveles. Se anade un "
-            "<b>6 % de ruido</b> en las etiquetas para forzar la generalizacion."
-        ),
-        subsection("Entrenamiento y calibracion isotonica"),
-        bullets([
-            "Train/test split estratificado 80/20 con <i>random_state=42</i>.",
-            "Entrenamiento del Random Forest con 400 arboles y <i>max_depth=12</i>.",
-            "Calibracion isotonica sobre las probabilidades del clasificador base.",
-            "Persistencia del modelo calibrado y de las metricas en <i>models/triage_model.joblib</i> y <i>models/triage_metrics.json</i>.",
-            "Duracion total del entrenamiento: ~16 segundos en CPU.",
-        ]),
-        subsection("Metricas y resultados"),
         table(
             ["Metrica", "low", "medium", "high", "critical", "Macro"],
             [
@@ -671,112 +539,15 @@ def build_ch5_models() -> list:
             "limitacion en la seccion 14."
         ),
         section("5.2", "Modelo CNN ResNet18 (clasificacion triple de radiografias)"),
-        subsection("Justificacion de la arquitectura"),
         p(
-            "Para la clasificacion de radiografias se ha seleccionado <b>ResNet18</b>. La "
-            "justificacion responde a cuatro criterios:"
+            "<b>ResNet18</b> (11.7 M parametros, CUDA) entrenado desde cero, 5 epochs, "
+            "batch 16, lr=5e-4, AdamW, CrossEntropyLoss con class weights inversos a la "
+            "frecuencia de clase (COVID-19=3.73 &gt; Sana=1.35 &gt; Neumonia=0.50) para "
+            "compensar el fuerte desbalance del dataset (6.432 imagenes: 576 COVID-19, "
+            "1.583 Sanas, 4.273 Neumonia). Preprocesado: resize 224x224, normalizacion "
+            "ImageNet, augmentation RandomHorizontalFlip + RandomRotation(8 grados)."
         ),
-        bullets([
-            "<b>Madurez probada</b>: ResNet18 es uno de los backbones mas usados en imagen medica con literatura abundante.",
-            "<b>Bajo coste de inferencia</b>: 11.7 M parametros, latencia de inferencia baja incluso en CPU.",
-            "<b>Profundidad razonable</b>: 18 capas suficientes para capturar patrones radiologicos sin sobreparametrizar.",
-            "<b>Escalabilidad</b>: si se necesita mas capacidad se puede pasar a ResNet50 o EfficientNet sin cambiar el resto del pipeline.",
-        ]),
-        subsection("Configuracion del entrenamiento"),
-        p(
-            "El modelo se ha entrenado en GPU (CUDA) sobre un dataset publico de "
-            "radiografias de torax con tres clases. La configuracion final usada en la "
-            "version 0.2.0 del artefacto se resume en la siguiente tabla."
-        ),
-        table(
-            ["Parametro", "Valor"],
-            [
-                ["Arquitectura", "ResNet18 (entrenada desde cero)"],
-                ["Dispositivo", "CUDA (GPU)"],
-                ["Epochs", "5"],
-                ["Batch size", "16"],
-                ["Learning rate", "5e-4"],
-                ["Optimizador", "AdamW"],
-                ["Loss", "CrossEntropyLoss con class weights"],
-                ["Class weights", "COVID-19=3.73, Sana=1.35, Neumonia=0.50"],
-                ["Val split", "20 % estratificado"],
-                ["Seed", "42 (reproducibilidad)"],
-                ["Duracion total", "1.055 segundos (~17.5 minutos)"],
-            ],
-            col_widths=[5.0 * cm, 11.5 * cm],
-        ),
-        p(
-            "Los <b>class weights</b> son inversamente proporcionales a la frecuencia de "
-            "cada clase. El dataset esta fuertemente desbalanceado (Neumonia es ~7 veces "
-            "mas frecuente que COVID-19), y esta ponderacion fuerza al modelo a no "
-            "ignorar las clases minoritarias durante el entrenamiento."
-        ),
-        subsection("Preprocesamiento y data augmentation"),
-        table(
-            ["Etapa", "Operacion"],
-            [
-                ["Resize", "224 x 224"],
-                ["Normalizacion", "mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]"],
-                ["Augmentation (train)", "RandomHorizontalFlip(p=0.5), RandomRotation(8 grados)"],
-                ["Conversion", "ToTensor"],
-            ],
-            col_widths=[4.0 * cm, 12.5 * cm],
-        ),
-        subsection("Distribucion del dataset"),
-        table(
-            ["Particion", "COVID-19", "Sana", "Neumonia", "Total"],
-            [
-                ["Train", "368", "1.013", "2.734", "4.115"],
-                ["Validation", "92", "253", "684", "1.029"],
-                ["Test", "116", "317", "855", "1.288"],
-                ["<b>Total</b>", "<b>576</b>", "<b>1.583</b>", "<b>4.273</b>", "<b>6.432</b>"],
-            ],
-            col_widths=[3.3 * cm, 3.3 * cm, 3.3 * cm, 3.3 * cm, 3.3 * cm],
-        ),
-        subsection("Evolucion del entrenamiento por epoch"),
-        table(
-            ["Epoch", "Train loss", "Train acc", "Val loss", "Val acc"],
-            [
-                ["1", "0.402", "0.823", "0.221", "0.915"],
-                ["2", "0.290", "0.877", "0.321", "0.865"],
-                ["3", "0.226", "0.903", "0.200", "0.930"],
-                ["4", "0.206", "0.910", "0.274", "0.894"],
-                ["<b>5</b>", "<b>0.214</b>", "<b>0.907</b>", "<b>0.147</b>", "<b>0.950</b>"],
-            ],
-            col_widths=[2.5 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm],
-        ),
-        p(
-            "El mejor checkpoint corresponde a la epoch 5, con una accuracy de validacion "
-            "del <b>95.04 %</b> y la loss mas baja observada. La curva muestra cierta "
-            "fluctuacion en validacion (caida en epoch 2 y 4) caracteristica del "
-            "entrenamiento desde cero sin warmup; la tendencia general es claramente "
-            "ascendente."
-        ),
-        subsection("Resultados sobre el conjunto de validacion (mejor checkpoint)"),
-        p("<b>Accuracy global: 95.04 %</b> &mdash; <b>Loss: 0.147</b>"),
-        table(
-            ["Clase", "Precision", "Recall", "F1-score", "Soporte"],
-            [
-                ["COVID-19", "0.899", "<b>0.967</b>", "0.932", "92"],
-                ["Sana", "0.901", "0.937", "0.919", "253"],
-                ["Neumonia", "0.978", "0.953", "0.965", "684"],
-                ["<b>Macro avg</b>", "<b>0.926</b>", "<b>0.952</b>", "<b>0.939</b>", "1.029"],
-                ["<b>Weighted avg</b>", "<b>0.952</b>", "<b>0.950</b>", "<b>0.951</b>", "1.029"],
-            ],
-            col_widths=[3.5 * cm, 3.0 * cm, 3.0 * cm, 3.0 * cm, 4.0 * cm],
-        ),
-        subsection("Matriz de confusion sobre validacion"),
-        table(
-            ["Real / Predicho", "COVID-19", "Sana", "Neumonia"],
-            [
-                ["<b>COVID-19</b>", "<b>89</b>", "1", "2"],
-                ["<b>Sana</b>", "3", "<b>237</b>", "13"],
-                ["<b>Neumonia</b>", "7", "25", "<b>652</b>"],
-            ],
-            col_widths=[4.5 * cm, 4.0 * cm, 4.0 * cm, 4.0 * cm],
-        ),
-        subsection("Resultados sobre el conjunto de test (generalizacion)"),
-        p("<b>Accuracy global: 93.94 %</b> &mdash; <b>Loss: 0.168</b>"),
+        p("<b>Resultados sobre test (conjunto de generalizacion): accuracy 93.94 %</b>"),
         table(
             ["Clase", "Precision", "Recall", "F1-score", "Soporte"],
             [
@@ -832,28 +603,11 @@ def build_ch5_models() -> list:
             "respuestas con el <i>model_name</i> <i>hospital-triage-rules-fallback</i>."
         ),
         section("5.4", "Analisis clinico (el porque)"),
-        subsection("Tipos de error y matriz de confusion"),
         p(
-            "Para el triaje, la matriz de confusion del Random Forest sobre el test set "
-            "(1.600 muestras) revela el siguiente comportamiento:"
-        ),
-        table(
-            ["Real / Predicho", "low", "medium", "high", "critical"],
-            [
-                ["low", "286", "75", "2", "0"],
-                ["medium", "58", "488", "36", "1"],
-                ["high", "2", "94", "150", "12"],
-                ["critical", "0", "2", "28", "366"],
-            ],
-            col_widths=[4.0 * cm, 3.1 * cm, 3.1 * cm, 3.1 * cm, 3.1 * cm],
-        ),
-        p(
-            "<b>Lectura clinica</b>: los errores se concentran en confusiones entre niveles "
-            "adyacentes (low &lt;-&gt; medium, medium &lt;-&gt; high). Las confusiones "
-            "<b>saltando dos niveles son raras</b>: solo 2 casos de <i>low</i> clasificados "
-            "como <i>high</i> y ninguno como <i>critical</i>. Esta es la propiedad mas "
-            "deseable: el modelo nunca \"olvida\" un caso critico clasificandolo como "
-            "trivial."
+            "<b>Lectura clinica del triaje</b>: los errores se concentran en confusiones "
+            "entre niveles adyacentes (low↔medium, medium↔high). Confusiones saltando dos "
+            "niveles son raras (2 casos de <i>low</i> como <i>high</i>, 0 como "
+            "<i>critical</i>): el modelo nunca clasifica un critico como trivial."
         ),
         subsection("Impacto de falsos negativos"),
         bullets([
@@ -885,18 +639,10 @@ def build_ch6_pipeline() -> list:
             "transparente y se integra de forma trivial con almacenamientos compatibles con "
             "S3 (como MinIO)."
         ),
-        section("6.2", "Fases del pipeline"),
-        p("El job Spark <i>radiology_pipeline.py</i> cubre cuatro fases secuenciales:"),
-        bullets([
-            "<b>1. Ingesta</b>: lectura del CSV desde <i>PIPELINE_INPUT_PATH</i> usando <i>spark.read.csv()</i> con cabecera, inferencia de tipos y opcion <i>multiLine</i>.",
-            "<b>2. Validacion</b>: comprobacion de columnas obligatorias, tipos, etiquetas validas y deteccion de duplicados por <i>image_object_key</i>.",
-            "<b>3. Transformacion</b>: trim de strings, normalizacion de campos categoricos, recalculo de columnas derivadas.",
-            "<b>4. Escritura</b>: persistencia de datos limpios en JSON a <i>PIPELINE_OUTPUT_PATH</i>, registro de ejecucion en PostgreSQL y publicacion de informe JSON en MinIO.",
-        ]),
-        section("6.3", "Validators, transforms y writers"),
+        section("6.2", "Modulos del pipeline"),
         p(
-            "El pipeline esta <b>modularizado</b> en submodulos especializados, cada uno "
-            "con una responsabilidad unica:"
+            "El job <i>radiology_pipeline.py</i> cubre cuatro fases (ingesta → validacion → "
+            "transformacion → escritura) mediante submodulos especializados:"
         ),
         table(
             ["Modulo", "Archivo", "Responsabilidad"],
@@ -937,39 +683,12 @@ def build_ch7_backend() -> list:
         chapter(7, "Backend (API REST)"),
         section("7.1", "Estructura modular"),
         p(
-            "El backend FastAPI sigue una <b>arquitectura en capas</b> con cinco "
-            "responsabilidades claramente separadas:"
-        ),
-        code(
-            "backend/app/\n"
-            "|- main.py                  app factory, lifespan, middleware\n"
-            "|- api/\n"
-            "|  |- deps.py               inyeccion de dependencias (lru_cache)\n"
-            "|  |- errors.py             handlers de error globales\n"
-            "|  '- routers/              5 routers HTTP\n"
-            "|      |- health.py\n"
-            "|      |- triage.py\n"
-            "|      |- radiology.py\n"
-            "|      |- quality.py\n"
-            "|      '- metrics.py\n"
-            "|- services/                logica de negocio\n"
-            "|  |- inference_service.py  carga y forward del ResNet18\n"
-            "|  |- triage_service.py     orquestacion triaje\n"
-            "|  |- triage_model.py       carga del Random Forest\n"
-            "|  |- radiology_service.py  flujo completo de prediccion\n"
-            "|  |- quality_service.py    gestion de eventos\n"
-            "|  |- metrics_service.py    agregados para dashboard\n"
-            "|  '- health_service.py     comprobacion de dependencias\n"
-            "|- repositories/            acceso a datos (psycopg)\n"
-            "|  |- radiology_repository.py\n"
-            "|  |- triage_repository.py\n"
-            "|  |- quality_repository.py\n"
-            "|  '- metrics_repository.py\n"
-            "|- db/                      session, pool, schema, transaccion\n"
-            "|- storage/                 adaptador S3 (boto3)\n"
-            "|- schemas/                 Pydantic (DTOs tipados)\n"
-            "|- core/                    config tipada, logging\n"
-            "'- utils/                   helpers transversales\n"
+            "El backend FastAPI sigue una <b>arquitectura en capas</b>: "
+            "<i>api</i> (routers, deps, errors) → <i>services</i> (logica de negocio) → "
+            "<i>repositories</i> (psycopg) → <i>db</i> (pool, transaccion) / <i>storage</i> (boto3). "
+            "Cada capa solo importa la inmediatamente inferior. La inyeccion de dependencias "
+            "usa <i>lru_cache</i> en <i>deps.py</i>; las transacciones ACID se gestionan con "
+            "un context manager Unit of Work que comparte cursor entre repositorios."
         ),
         section("7.2", "Endpoints expuestos"),
         table(
@@ -990,29 +709,6 @@ def build_ch7_backend() -> list:
             ],
             col_widths=[6.5 * cm, 10.0 * cm],
         ),
-        section("7.3", "Capa de persistencia"),
-        p(
-            "El backend utiliza un <b>connection pool</b> de psycopg con tamano configurable "
-            "(por defecto 2 a 10 conexiones). El pool se abre en el <i>lifespan</i> de "
-            "FastAPI y se cierra al apagarse. Cada operacion compuesta se ejecuta dentro de "
-            "una <b>transaccion ACID</b> mediante un context manager que comparte el cursor "
-            "entre los repositorios implicados, garantizando que el estudio, los eventos "
-            "asociados y los informes JSON queden persistidos atomicamente."
-        ),
-        p(
-            "El esquema de PostgreSQL incluye las tablas <i>radiology_studies</i>, "
-            "<i>triage_assessments</i>, <i>quality_events</i> y <i>pipeline_runs</i>, "
-            "creadas automaticamente al arranque con reintentos espaciados 2 segundos para "
-            "tolerar arranques concurrentes con la base de datos."
-        ),
-        section("7.4", "Healthchecks y observabilidad"),
-        bullets([
-            "<b>Liveness</b>: <i>GET /health</i> responde 200 si el servicio esta arriba.",
-            "<b>Readiness</b>: verifica conectividad con PostgreSQL y MinIO; devuelve estado por dependencia.",
-            "<b>Healthcheck Docker</b>: cada 10 segundos urllib comprueba <i>http://localhost:8000/health</i>.",
-            "<b>Logs estructurados</b>: formato JSON con campos timestamp, level, service, message y trace context cuando aplica.",
-            "<b>Snapshot de negocio</b>: <i>GET /metrics</i> retorna agregados consumidos por el dashboard (radiografias procesadas, distribucion por clase, triajes por nivel, eventos abiertos por severidad, ultima ejecucion del pipeline).",
-        ]),
         PageBreak(),
     ]
     return out
@@ -1021,60 +717,27 @@ def build_ch7_backend() -> list:
 def build_ch8_dashboard() -> list:
     out: list = [
         chapter(8, "Dashboard"),
-        section("8.1", "Arquitectura Flask"),
         p(
-            "El dashboard utiliza Flask con el patron <b>app factory</b> y <b>blueprints</b>. "
-            "Esto permite separar la creacion de la aplicacion de su configuracion, facilita "
-            "el testing con clientes efimeros y permite registrar grupos de rutas como "
-            "modulos independientes."
+            "Flask con patron <b>app factory</b> y <b>blueprints</b> (auth, main). "
+            "Autenticacion con hashes PBKDF2-SHA256 (Werkzeug, 1M iteraciones), cookie "
+            "firmada con SECRET_KEY, HttpOnly, SameSite=Lax. Dos roles: <i>admin</i> "
+            "(todas las vistas + consola MinIO) e <i>user</i> (radiologia y triaje)."
         ),
-        code(
-            "dashboard/app/\n"
-            "|- factory.py               create_app() con config tipada\n"
-            "|- auth/                    Werkzeug, sesiones firmadas, roles\n"
-            "|- blueprints/\n"
-            "|  |- auth.py               /login, /logout\n"
-            "|  '- main.py               /, /upload, /history, /events, /storage\n"
-            "|- services/                cliente HTTP del backend, cliente MinIO\n"
-            "|- presenters/              traduccion de respuestas API a vistas\n"
-            "|- triage/                  servicios y formularios de triaje\n"
-            "|- validation/              validacion de imagenes en cliente\n"
-            "|- core/                    config tipada, logging JSON\n"
-            "'- templates / static       Jinja2, CSS, JS minimo\n"
-        ),
-        section("8.2", "Autenticacion y roles"),
-        bullets([
-            "<b>Hash de contrasenas</b>: PBKDF2-SHA256 con 1.000.000 iteraciones (Werkzeug).",
-            "<b>Variables sensibles</b>: <i>ADMIN_USERNAME</i>, <i>ADMIN_PASSWORD_HASH</i>, <i>USER_USERNAME</i>, <i>USER_PASSWORD_HASH</i> definidas en <i>.env</i>.",
-            "<b>Dos roles</b>: <i>admin</i> (acceso a almacenamiento MinIO y todas las vistas) y <i>user</i> (solo radiologia y resultados).",
-            "<b>Cookie de sesion</b>: firmada con <i>SECRET_KEY</i> (>= 32 bytes), HttpOnly, SameSite=Lax, Secure en produccion (controlable con <i>SESSION_COOKIE_SECURE</i>).",
-            "<b>Proteccion CSRF</b>: tokens generados por sesion para formularios criticos.",
-            "<b>Decorator <i>login_required</i></b>: aplicado a todas las rutas que no son <i>/login</i>.",
-        ]),
-        section("8.3", "Vistas principales"),
         table(
-            ["Ruta", "Plantilla", "Funcion"],
+            ["Ruta", "Funcion"],
             [
-                ["GET /login", "login.html", "Formulario de autenticacion"],
-                ["GET /", "index.html", "Dashboard principal con metricas y atajos"],
-                ["GET /upload", "upload.html", "Formulario de subida de radiografia"],
-                ["POST /upload", "result.html", "Resultado de la clasificacion"],
-                ["GET /triage", "triage.html", "Formulario de evaluacion de triaje"],
-                ["POST /triage", "triage_result.html", "Resultado del triaje"],
-                ["GET /history", "history.html", "Historial de estudios y triajes"],
-                ["GET /events", "events.html", "Eventos de calidad abiertos"],
-                ["GET /storage", "storage.html", "(admin) consola de MinIO embebida"],
-                ["GET /logout", "-", "Invalidacion de sesion"],
+                ["GET / POST /upload", "Subida de radiografia y resultado CNN"],
+                ["GET / POST /triage", "Formulario de triaje y resultado RF"],
+                ["GET /history", "Historial de estudios y triajes"],
+                ["GET /events", "Eventos de calidad abiertos por severidad"],
+                ["GET /storage (admin)", "Consola MinIO embebida"],
             ],
-            col_widths=[3.5 * cm, 3.5 * cm, 9.5 * cm],
+            col_widths=[5.5 * cm, 11.0 * cm],
         ),
-        section("8.4", "Integracion con backend y MinIO"),
         bullets([
-            "<b>Cliente HTTP del backend</b>: servicio interno con timeout, manejo de errores y mapeo de respuestas a presenters.",
-            "<b>Cliente MinIO con boto3</b>: subida directa de imagenes desde el navegador a <i>uploads/&lt;uuid&gt;.&lt;ext&gt;</i>.",
-            "<b>Visualizacion del resultado</b>: imagen original incrustada en base64, probabilidades por clase, banderas de calidad y enlace al informe JSON en MinIO.",
-            "<b>Historico</b>: paginacion y ordenacion descendente por timestamp.",
-            "<b>Estado del pipeline</b>: el dashboard consume <i>GET /metrics</i> y renderiza un panel con la ultima ejecucion del job Spark.",
+            "<b>Resultado CNN</b>: imagen en base64, probabilidades por clase, banderas de calidad y enlace al informe JSON.",
+            "<b>Estado del sistema</b>: consume <i>GET /metrics</i> del backend y muestra estado del modelo de triaje, pipeline y bucket.",
+            "<b>Subida directa a MinIO</b>: imagen subida via boto3 antes de llamar al backend, evitando duplicar trafico.",
         ]),
         PageBreak(),
     ]
@@ -1084,25 +747,14 @@ def build_ch8_dashboard() -> list:
 def build_ch9_automation() -> list:
     out: list = [
         chapter(9, "Automatizaciones"),
-        section("9.1", "Creacion automatica de bucket MinIO"),
         p(
-            "El adaptador <i>ObjectStorage</i> incluye un metodo <i>ensure_bucket()</i> "
-            "que crea el bucket si no existe, controlado por la bandera "
-            "<i>MINIO_AUTO_CREATE_BUCKET</i>. Esto elimina la friccion de tener que "
-            "preparar el bucket manualmente antes del primer arranque."
+            "El sistema implementa cinco automatizaciones sin intervencion manual: "
+            "creacion de bucket MinIO al primer arranque (<i>ensure_bucket</i>), "
+            "generacion de informes JSON por prediccion/triaje/pipeline, "
+            "emision de eventos de calidad en la misma transaccion ACID, "
+            "procesamiento batch Spark on-demand y healthchecks con reinicios automaticos."
         ),
-        section("9.2", "Generacion automatica de informes JSON"),
-        bullets([
-            "<b>Por estudio radiologico</b>: cada llamada a <i>/predict</i> persiste un JSON en <i>radiology-reports/&lt;study_id&gt;.json</i> con resultado, probabilidades, metadatos y nota clinica.",
-            "<b>Por triaje</b>: cada llamada a <i>/triage</i> persiste un JSON en <i>triage-reports/&lt;triage_id&gt;.json</i> con score, nivel de riesgo, prioridad recomendada y desglose por variable.",
-            "<b>Por ejecucion de pipeline</b>: cada run del job Spark publica un JSON en <i>pipeline-reports/&lt;run_id&gt;.json</i> con distribucion de clases, rechazos y duplicados.",
-        ]),
-        section("9.3", "Eventos de calidad automaticos"),
-        p(
-            "Los eventos se generan dentro de la misma transaccion que la operacion que los "
-            "dispara, garantizando consistencia ACID. Si la operacion falla, los eventos no "
-            "quedan huerfanos."
-        ),
+        subsection("Eventos de calidad automaticos"),
         table(
             ["Trigger", "Severidad", "Origen"],
             [
@@ -1115,21 +767,11 @@ def build_ch9_automation() -> list:
             ],
             col_widths=[5.5 * cm, 2.5 * cm, 8.5 * cm],
         ),
-        section("9.4", "Procesamiento batch del pipeline"),
+        subsection("Healthchecks y reinicios"),
         bullets([
-            "El job Spark se ejecuta bajo demanda con <i>docker compose --profile pipeline up pipeline</i>.",
-            "Procesa todo el CSV de entrada en una sola pasada, validando, transformando, escribiendo y reportando.",
-            "El resultado queda inmediatamente accesible para el dashboard via las metricas del backend.",
-            "Cualquier fallo del job genera evento <i>high</i> automaticamente y se registra en <i>pipeline_runs</i> con status <i>failed</i>.",
-        ]),
-        section("9.5", "Healthchecks y reinicios"),
-        bullets([
-            "<b>Backend</b>: healthcheck con urllib cada 10 segundos contra <i>/health</i>; reinicio automatico si falla.",
-            "<b>PostgreSQL</b>: healthcheck con <i>pg_isready</i> cada 10 segundos.",
-            "<b>MinIO</b>: healthcheck con <i>mc ready local</i> cada 10 segundos.",
-            "<b>restart: always</b> en backend, dashboard, db, minio, spark, spark-worker: reinicio automatico ante cualquier caida.",
-            "<b>restart: \"no\"</b> en pipeline y trainers: se ejecutan una sola vez (jobs batch).",
-            "<b>depends_on con condition</b>: el backend solo arranca cuando db y minio estan saludables.",
+            "<b>restart: always</b> en backend, dashboard, db, minio, spark, spark-worker; <b>restart: no</b> en pipeline y trainers (jobs batch).",
+            "<b>Backend</b>: urllib contra <i>/health</i> cada 10 s. <b>PostgreSQL</b>: <i>pg_isready</i> cada 10 s. <b>MinIO</b>: <i>mc ready local</i> cada 10 s.",
+            "<b>depends_on + condition: service_healthy</b>: el backend no arranca hasta que db y minio esten sanos.",
         ]),
         PageBreak(),
     ]
@@ -1139,29 +781,7 @@ def build_ch9_automation() -> list:
 def build_ch10_integrations() -> list:
     out: list = [
         chapter(10, "Integraciones"),
-        section("10.1", "Flujo completo de datos end-to-end"),
-        p(
-            "El recorrido completo de un estudio radiologico, desde que el usuario sube la "
-            "imagen hasta que el informe queda persistido y disponible para consulta, "
-            "atraviesa los siguientes pasos:"
-        ),
-        code(
-            "1. Usuario autenticado abre /upload en dashboard\n"
-            "2. Dashboard valida formato/tamano en cliente (JS)\n"
-            "3. Dashboard sube imagen a MinIO bajo uploads/<uuid>.<ext>\n"
-            "4. Dashboard hace POST /predict al backend con imagen + object_key\n"
-            "5. Backend valida imagen con Pillow (MIME real, contenido)\n"
-            "6. Backend ejecuta InferenceService.predict()\n"
-            "7. Backend abre transaccion (Unit of Work)\n"
-            "   7.1. INSERT en radiology_studies (PostgreSQL)\n"
-            "   7.2. PUT en radiology-reports/<id>.json (MinIO)\n"
-            "   7.3. INSERT en quality_events si COVID o baja confianza (PostgreSQL)\n"
-            "   7.4. COMMIT atomico\n"
-            "8. Backend devuelve respuesta JSON tipada\n"
-            "9. Dashboard renderiza resultado en result.html\n"
-            "10. Usuario puede descargar el informe desde el enlace MinIO\n"
-        ),
-        section("10.2", "Conexiones entre modulos"),
+        section("10.1", "Conexiones entre modulos"),
         table(
             ["Origen", "Destino", "Protocolo", "Proposito"],
             [
@@ -1176,18 +796,6 @@ def build_ch10_integrations() -> list:
             ],
             col_widths=[2.8 * cm, 2.8 * cm, 3.4 * cm, 7.5 * cm],
         ),
-        section("10.3", "Variables de entorno y configuracion externalizada"),
-        p(
-            "La configuracion se carga de forma <b>tipada al arranque</b> (fail-fast). Si "
-            "una variable obligatoria falta, el servicio aborta inmediatamente con un "
-            "mensaje claro. La sintaxis <i>${VAR:?Set VAR in .env}</i> en docker-compose.yml "
-            "fuerza este comportamiento."
-        ),
-        p(
-            "Las variables se agrupan logicamente en cinco bloques: PostgreSQL, MinIO, "
-            "autenticacion del dashboard, parametros de entrenamiento y configuracion del "
-            "pipeline. El detalle completo se documenta en el <b>Anexo B</b>."
-        ),
         PageBreak(),
     ]
     return out
@@ -1197,13 +805,6 @@ def build_ch11_quality() -> list:
     out: list = [
         chapter(11, "Calidad, testing y CI/CD"),
         section("11.1", "Cobertura de tests"),
-        p(
-            "El proyecto incluye una suite de tests automatizados organizada en dos capas "
-            "(unit y api/web). La estrategia es usar <b>dobles que respetan los contratos "
-            "reales</b> de las interfaces, no MagicMock genericos, lo que permite que los "
-            "cambios de infraestructura (por ejemplo migracion a connection pool) no rompan "
-            "los tests."
-        ),
         table(
             ["Componente", "Archivos de test", "Tipo"],
             [
@@ -1216,32 +817,18 @@ def build_ch11_quality() -> list:
             col_widths=[4.5 * cm, 4.5 * cm, 7.5 * cm],
         ),
         p(
-            "Las suites se ejecutan con <i>pytest --cov=app --cov-report=term</i> en cada "
-            "modulo. La cobertura de la logica de negocio supera el 90 % en el backend."
+            "Estrategia: <b>dobles que respetan los contratos reales</b> (no MagicMock); "
+            "tests de API con <i>dependency_overrides</i>. Cobertura &gt; 90 % en logica "
+            "de negocio del backend."
         ),
-        section("11.2", "Validacion de calidad de datos"),
+        section("11.2", "Calidad de datos, logging y CI"),
         bullets([
-            "<b>En el cliente</b>: JavaScript verifica extension y tamano antes de la subida.",
-            "<b>En el servidor (FastAPI)</b>: Pillow comprueba el contenido binario real, no solo el MIME declarado.",
-            "<b>En el pipeline (Spark)</b>: validacion de schema, deteccion de duplicados, etiquetas validas, no nulos en campos clave.",
-            "<b>Generacion automatica de eventos</b>: cualquier registro rechazado o problema de calidad genera una entrada en <i>quality_events</i>.",
-            "<b>Dashboard de calidad</b>: vista dedicada en <i>/events</i> que lista eventos abiertos por severidad.",
-        ]),
-        section("11.3", "Logging centralizado"),
-        p(
-            "Todos los servicios (backend, dashboard, pipeline) utilizan el modulo "
-            "<i>logging</i> de Python configurado en formato JSON estructurado. Cada linea "
-            "de log incluye timestamp ISO 8601, level, servicio, mensaje y contexto "
-            "adicional (request_id, study_id, run_id cuando aplica). Esto facilita el "
-            "agregado en herramientas de log management futuras (ELK, Loki)."
-        ),
-        section("11.4", "Pipeline CI (GitHub Actions)"),
-        bullets([
-            "Workflow <i>.github/workflows/ci.yml</i> dispara en cada push y pull request.",
-            "Ejecuta <i>pytest --cov</i> sobre backend y dashboard.",
-            "Valida la sintaxis de <i>docker-compose.yml</i> con <i>docker compose config</i>.",
-            "Falla rapido ante cualquier fallo de test o de validacion.",
-            "Garantiza que la rama principal mantiene siempre los tests en verde.",
+            "<b>Cliente</b>: JavaScript verifica extension y tamano antes de la subida.",
+            "<b>Servidor (FastAPI)</b>: Pillow comprueba el contenido binario real, no solo el MIME.",
+            "<b>Pipeline (Spark)</b>: schema, duplicados por <i>image_object_key</i>, etiquetas validas, no nulos en campos clave.",
+            "<b>Eventos automaticos</b>: cada rechazo genera entrada en <i>quality_events</i>; vista <i>/events</i> en dashboard.",
+            "<b>Logs JSON estructurados</b>: timestamp ISO 8601, level, servicio, request_id / study_id en backend, dashboard y pipeline.",
+            "<b>CI GitHub Actions</b>: <i>pytest --cov</i> + <i>docker compose config</i> en cada push/PR; falla rapido.",
         ]),
         PageBreak(),
     ]
@@ -1251,90 +838,41 @@ def build_ch11_quality() -> list:
 def build_ch12_justification() -> list:
     out: list = [
         chapter(12, "Justificaciones tecnicas y alternativas"),
-        section("12.1", "Eleccion de PostgreSQL + MinIO"),
         p(
-            "<b>Alternativas evaluadas</b>: MySQL, MongoDB, SQLite, GridFS, sistema de "
-            "archivos local, Amazon S3, Azure Blob.<br/>"
-            "<b>Decision</b>: PostgreSQL 16 + MinIO.<br/>"
-            "<b>Motivo</b>: PostgreSQL ofrece transacciones ACID solidas, JSONB para datos "
-            "semiestructurados, indices parciales y agregados condicionales que simplifican "
-            "consultas de metricas. MinIO ofrece la API S3 estandar, permitiendo migrar a "
-            "AWS S3 real con un simple cambio de configuracion. MongoDB se descarto porque "
-            "la mayoria de datos tienen esquema estable y se benefician de garantias "
-            "relacionales. GridFS fragmentaria el almacenamiento entre dos sistemas "
-            "distintos (estructurado y binario en Mongo) complicando los backups."
+            "Las decisiones de stack priorizan reproducibilidad, interpretabilidad clinica "
+            "y alineacion con estandares del sector."
         ),
-        section("12.2", "Eleccion de Spark sobre Dask y Beam"),
-        p(
-            "<b>Alternativas evaluadas</b>: Dask, Apache Beam, pandas con procesamiento por "
-            "lotes.<br/>"
-            "<b>Decision</b>: Apache Spark 3.5.8 con PySpark.<br/>"
-            "<b>Motivo</b>: Spark es el estandar de facto en entornos hospitalarios y de "
-            "investigacion biomedica con grandes volumenes. Dask es atractivo para "
-            "workloads numpy-centric pero menos maduro para SQL y joins. Apache Beam ofrece "
-            "portabilidad multi-runner que excede el alcance del prototipo. Aunque el "
-            "volumen del prototipo es pequeno, la eleccion de Spark prepara la plataforma "
-            "para escalado horizontal real."
+        table(
+            ["Decision", "Alternativas evaluadas", "Motivo principal"],
+            [
+                ["PostgreSQL + MinIO",
+                 "MySQL, MongoDB, SQLite, GridFS, S3",
+                 "ACID garantizado + JSONB; API S3 estandar (migracion trivial a AWS S3 real)"],
+                ["Apache Spark 3.5.8",
+                 "Dask, Apache Beam, pandas batch",
+                 "Estandar hospitalario; SQL maduro; escalado horizontal preparado para produccion"],
+                ["Random Forest + calibracion isotonica",
+                 "XGBoost, LightGBM, MLP, reglas puras",
+                 "Feature importances interpretables clinicamente; calibracion corrige sesgo de probabilidades en RF"],
+                ["ResNet18 + transfer learning",
+                 "CNN propia, ResNet50, EfficientNet, ViT",
+                 "Balance capacidad/latencia (&lt; 50 ms CPU); backbone estandar en literatura clinica"],
+                ["FastAPI (backend)",
+                 "Flask, Django REST, Litestar",
+                 "Tipado Pydantic, OpenAPI automatico, soporte asincrono nativo"],
+                ["Flask + Jinja (dashboard)",
+                 "Streamlit, Dash, SPA React/Vue",
+                 "Flujos transaccionales con auth; Streamlit no permite personalizacion medica suficiente"],
+                ["Docker Compose",
+                 "Kubernetes, Nomad, podman-compose",
+                 "Un solo comando de despliegue; enunciado lo exige explicitamente"],
+            ],
+            col_widths=[3.3 * cm, 4.7 * cm, 8.5 * cm],
         ),
-        section("12.3", "Eleccion de Random Forest para triaje"),
-        p(
-            "<b>Alternativas evaluadas</b>: Logistic Regression, Gradient Boosting (XGBoost, "
-            "LightGBM), red neuronal tabular (MLP), reglas deterministas puras.<br/>"
-            "<b>Decision</b>: Random Forest con 400 arboles y calibracion isotonica.<br/>"
-            "<b>Motivo</b>: la interpretabilidad clinica es obligatoria en triaje (cada "
-            "decision debe poder explicarse a un facultativo). Random Forest ofrece feature "
-            "importances directamente comparables con la intuicion clinica. XGBoost habria "
-            "dado quizas un 1-2 % mas de accuracy pero a costa de complejidad de tuning y "
-            "explicabilidad. Las redes neuronales tabulares no estan justificadas para 17 "
-            "features con 8.000 muestras. La calibracion isotonica corrige el sesgo de "
-            "probabilidades tipico en RF."
-        ),
-        section("12.4", "Eleccion de ResNet18 para clasificacion radiologica"),
-        p(
-            "<b>Alternativas evaluadas</b>: CNN propia, ResNet50, EfficientNet-B0, Vision "
-            "Transformer (ViT), DenseNet121.<br/>"
-            "<b>Decision</b>: ResNet18 con transfer learning opcional desde ImageNet.<br/>"
-            "<b>Motivo</b>: balance entre capacidad (11.7M parametros) y coste de "
-            "inferencia (latencia &lt; 50 ms en CPU). Literatura medica abundante con "
-            "este backbone. Transfer learning eficaz incluso con datasets hospitalarios "
-            "pequenos. ResNet50 anadiria 14M parametros sin ganancia clara en datasets "
-            "pequenos. ViT requiere muchos mas datos para entrenar desde cero. EfficientNet "
-            "es competitiva pero menos estandar en literatura clinica."
-        ),
-        section("12.5", "Eleccion de FastAPI + Flask"),
-        p(
-            "<b>Alternativas para backend</b>: Flask, Django REST, Litestar.<br/>"
-            "<b>Decision backend</b>: FastAPI.<br/>"
-            "<b>Motivo</b>: tipado fuerte mediante Pydantic, generacion automatica de "
-            "OpenAPI consumible desde el dashboard de pruebas, soporte asincrono nativo, "
-            "ecosistema maduro de inyeccion de dependencias. Flask habria requerido capas "
-            "adicionales (Marshmallow, Flask-RESTX) para alcanzar la misma validacion."
-        ),
-        p(
-            "<b>Alternativas para dashboard</b>: Streamlit, Dash, FastAPI con Jinja, SPA "
-            "(React/Vue).<br/>"
-            "<b>Decision dashboard</b>: Flask con Jinja y blueprints.<br/>"
-            "<b>Motivo</b>: Streamlit no permite personalizacion visual suficiente para una "
-            "UI medica. Dash esta orientado a visualizacion analitica, no a flujos "
-            "transaccionales con autenticacion. Un SPA habria sobredimensionado el proyecto."
-        ),
-        section("12.6", "Eleccion de Docker Compose"),
-        p(
-            "<b>Alternativas evaluadas</b>: Kubernetes (kind / minikube), Nomad, "
-            "podman-compose.<br/>"
-            "<b>Decision</b>: Docker Compose.<br/>"
-            "<b>Motivo</b>: el enunciado pide explicitamente que cualquier persona pueda "
-            "levantar el sistema con un unico comando. Kubernetes anadiria una curva de "
-            "aprendizaje desproporcionada para un prototipo. La migracion futura a "
-            "Kubernetes es factible reutilizando los Dockerfiles existentes."
-        ),
-        section("12.7", "Alternativas descartadas"),
         bullets([
-            "<b>SQLAlchemy ORM</b>: descartado en favor de psycopg directo + repositorios; el proyecto no necesita el overhead de un ORM completo y SQL puro es mas predecible para consultas analiticas.",
-            "<b>Conexion por request</b>: descartado en favor de psycopg_pool para evitar el coste de handshake TLS y autenticacion en cada peticion.",
-            "<b>pgbouncer externo</b>: descartado por anadir un servicio mas; el pool del cliente es suficiente para la carga del prototipo.",
-            "<b>Pipelines schedulados con cron</b>: descartado para esta entrega; el pipeline se ejecuta on-demand. Migracion futura a Airflow o Prefect documentada en el capitulo 14.",
-            "<b>Telemetria externa (Datadog, New Relic)</b>: descartado por preservar control de datos sensibles y reducir dependencia de SaaS de terceros.",
+            "<b>SQLAlchemy ORM descartado</b>: psycopg directo + repositorios es mas predecible para consultas analiticas.",
+            "<b>Conexion por request descartada</b>: psycopg_pool evita el coste de handshake en cada peticion.",
+            "<b>Scheduler diferido</b>: pipeline on-demand; migracion a Airflow/Prefect documentada en capitulo 14.",
         ]),
         PageBreak(),
     ]
@@ -1354,155 +892,61 @@ def build_ch13_diario() -> list:
             "<b>Codex de OpenAI</b>: utilizado en fases iniciales para generar el esqueleto del backend, dashboard y docker-compose. Documentado en commits anteriores a la rama actual.",
             "<b>ChatGPT (GPT-4)</b>: consultado puntualmente para resolver dudas conceptuales (calibracion isotonica, eleccion de buckets de histograma, patrones de Spark).",
         ]),
-        p(
-            "<b>Justificacion de la combinacion</b>: Claude Code excele en cambios "
-            "extensos sobre el repositorio con validacion automatizada (ideal para la "
-            "fase de consolidacion); Codex resulta mas agil para autocompletado puntual; "
-            "ChatGPT es eficaz como pizarra conceptual. Las tres herramientas estan "
-            "explicitamente listadas en el enunciado como aceptadas."
-        ),
         section("13.2", "Ejemplos representativos de prompts"),
         p(
-            "A continuacion se presentan seis prompts representativos del proceso de "
-            "desarrollo, organizados por fase. Cada uno incluye el texto enviado a la "
-            "herramienta, el resultado obtenido, la valoracion y el aprendizaje extraido."
+            "A continuacion se presentan cuatro prompts representativos del proceso de "
+            "desarrollo, organizados por fase."
         ),
         subsection("Prompt 1 — Auditoria inicial del repositorio"),
         code(
-            "Herramienta: Claude Code\n"
-            "Fase: Auditoria inicial\n\n"
-            "Prompt:\n"
-            "  Revisa que todo lo del enunciado se cumple. Analiza el repositorio\n"
-            "  completo y dame un informe de que falta y que esta mal."
+            "Herramienta: Claude Code  |  Fase: Auditoria inicial\n\n"
+            "Prompt: Revisa que todo lo del enunciado se cumple. Analiza el\n"
+            "  repositorio completo y dame un informe de que falta y que esta mal."
         ),
         bullets([
-            "<b>Resultado</b>: la IA identifico que el backend era un monolito en un solo archivo, que no habia tests, que el clasificador radiologico activo era un baseline estadistico sin modelo entrenado, y que faltaban pipeline Spark funcional, calidad de datos, automatizaciones y documentacion tecnica completa.",
-            "<b>Valoracion</b>: acierto total. La auditoria fue precisa y accionable.",
-            "<b>Aprendizaje</b>: dar a la IA acceso al enunciado junto con el repositorio permite detectar la brecha entre lo pedido y lo entregado mejor que una revision manual rapida.",
+            "<b>Resultado</b>: backend monolito en un solo archivo, sin tests, clasificador radiologico como baseline estadistico, sin pipeline Spark funcional ni documentacion.",
+            "<b>Aprendizaje</b>: dar a la IA el enunciado junto con el repositorio detecta la brecha mejor que una revision manual rapida.",
         ]),
         subsection("Prompt 2 — Modularizacion del backend"),
         code(
-            "Herramienta: Claude Code\n"
-            "Fase: Refactor arquitectonico\n\n"
-            "Prompt:\n"
-            "  El backend esta en un solo archivo. Refactorizalo siguiendo una\n"
+            "Herramienta: Claude Code  |  Fase: Refactor arquitectonico\n\n"
+            "Prompt: El backend esta en un solo archivo. Refactorizalo siguiendo\n"
             "  arquitectura en capas: api / services / repositories / db / storage.\n"
             "  Cada capa solo puede importar la inmediatamente inferior.\n"
             "  No rompas los tests que ya existen."
         ),
         bullets([
-            "<b>Resultado</b>: la IA propuso la estructura de directorios, los contratos de cada capa (interfaces implicitas via duck typing), el patron Unit of Work con context manager para transacciones ACID y la inyeccion de dependencias via <i>lru_cache</i> en <i>deps.py</i>. El refactor se completo sin romper ninguna ruta existente.",
-            "<b>Valoracion</b>: acierto. La propuesta de Unit of Work fue espontanea (no estaba en el prompt) y resulto critica para la transaccionalidad.",
-            "<b>Aprendizaje</b>: especificar restricciones de importacion en el prompt obliga a la IA a razonar sobre dependencias y genera arquitecturas mas limpias que pedir simplemente 'modulariza'.",
+            "<b>Resultado</b>: la IA propuso estructura de directorios, contratos de cada capa, patron Unit of Work espontaneo (no estaba en el prompt) e inyeccion de dependencias via <i>lru_cache</i>.",
+            "<b>Aprendizaje</b>: especificar restricciones de importacion obliga a razonar sobre dependencias y genera arquitecturas mas limpias.",
         ]),
         subsection("Prompt 3 — Generacion de la suite de tests"),
         code(
-            "Herramienta: Claude Code\n"
-            "Fase: Testing\n\n"
-            "Prompt:\n"
-            "  Crea tests para el backend. No uses MagicMock generico: cada doble\n"
-            "  debe implementar la misma interfaz que la clase real. Los tests de\n"
-            "  API deben usar dependency_overrides de FastAPI, no parchear imports."
+            "Herramienta: Claude Code  |  Fase: Testing\n\n"
+            "Prompt: Crea tests para el backend. No uses MagicMock generico: cada\n"
+            "  doble debe implementar la misma interfaz que la clase real. Los tests\n"
+            "  de API deben usar dependency_overrides de FastAPI, no parchear imports."
         ),
         bullets([
-            "<b>Resultado</b>: la IA genero 18 archivos de test (12 unit + 6 api) con fakes que implementan los contratos reales de <i>DatabaseSession</i> y <i>ObjectStorage</i>. Tres tests fallaron en la primera ejecucion por asunciones incorrectas sobre el comportamiento del codigo.",
-            "<b>Valoracion</b>: iteracion necesaria. El codigo base tuvo que ajustarse en dos puntos menores (firma de metodos) para que los contratos fueran coherentes.",
-            "<b>Aprendizaje</b>: la restriccion explicita de 'no MagicMock' en el prompt es imprescindible; sin ella la IA genera tests que pasan con cualquier implementacion, incluyendo las rotas.",
+            "<b>Resultado</b>: 18 archivos de test (12 unit + 6 api) con fakes que implementan contratos reales. Tres tests fallaron en la primera ejecucion por asunciones incorrectas.",
+            "<b>Aprendizaje</b>: la restriccion 'no MagicMock' es imprescindible; sin ella la IA genera tests que pasan con cualquier implementacion, incluyendo las rotas.",
         ]),
-        subsection("Prompt 4 — Integracion del modelo de triaje"),
+        subsection("Prompt 4 — Eliminacion de componentes no utilizados"),
         code(
-            "Herramienta: Claude Code\n"
-            "Fase: Integracion de modelos\n\n"
-            "Prompt:\n"
-            "  El dashboard muestra 'Triaje IA: fallback heuristico' aunque el\n"
-            "  archivo triage_model.joblib existe en /models. Encuentra por que\n"
-            "  el backend no lo carga y arreglalo sin romper los tests."
+            "Herramienta: Claude Code  |  Fase: Limpieza de infraestructura\n\n"
+            "Prompt: Quita Prometheus y Grafana del proyecto. Desinstalalos, quita\n"
+            "  el codigo y asegurate de no romper nada por el camino."
         ),
         bullets([
-            "<b>Resultado</b>: la IA detecto que el archivo <i>triage_model.py</i> habia desaparecido en un merge (se verifico con <i>git log --all --diff-filter=AD</i>). Lo recupero de un commit anterior, lo reintegro con el patron singleton thread-safe y anadio el bloque <i>services.triage_model</i> al schema <i>PlatformMetrics</i>, que era el motivo por el que el dashboard no recibia el estado real del modelo.",
-            "<b>Valoracion</b>: acierto. La IA uso git para diagnosticar la causa raiz en lugar de suponer un error de configuracion.",
-            "<b>Aprendizaje</b>: describir el sintoma observable (lo que muestra el dashboard) en lugar del problema tecnico subyacente permite a la IA rastrear la cadena causal completa.",
+            "<b>Resultado</b>: la IA mapeo 12 archivos afectados, elimino contadores de tres servicios, borro el router prometheus.py, limpio docker-compose.yml, paro contenedores huerfanos y valido con <i>docker compose config</i>.",
+            "<b>Aprendizaje</b>: para tareas de eliminacion es mas seguro mapear dependencias antes de borrar; un borrado manual habria dejado imports rotos.",
         ]),
-        subsection("Prompt 5 — Eliminacion de componentes no utilizados"),
-        code(
-            "Herramienta: Claude Code\n"
-            "Fase: Limpieza de infraestructura\n\n"
-            "Prompt:\n"
-            "  Quita Prometheus y Grafana del proyecto. Desinstalalos, quita el\n"
-            "  codigo y asegurate de no romper nada por el camino."
-        ),
+        section("13.3", "Aciertos, correcciones e impacto"),
         bullets([
-            "<b>Resultado</b>: la IA mapeo todas las referencias (12 archivos), elimino los contadores de <i>app/core/metrics.py</i> de los tres servicios que los importaban, borro el router <i>prometheus.py</i>, limpio el <i>docker-compose.yml</i>, elimino las carpetas de infraestructura, paro y borro los contenedores huerfanos y sus volumenes, y valido con <i>docker compose config</i> antes de dar la tarea por completada.",
-            "<b>Valoracion</b>: acierto. El orden de operaciones fue correcto: primero el codigo, luego la infraestructura, finalmente la validacion.",
-            "<b>Aprendizaje</b>: para tareas de eliminacion es mas seguro dejar que la IA mapee las dependencias antes de borrar; un borrado manual sin ese mapa habria dejado imports rotos.",
+            "<b>Aciertos</b>: auditoria inicial precisa; Unit of Work espontaneo; singleton thread-safe del RF; dobles de tests con contratos reales; coherencia estilistica entre modulos.",
+            "<b>Correcciones necesarias</b>: tres tests fallaron en primera ejecucion (asunciones incorrectas); sobre-ingenieria rechazada en varias propuestas; schema <i>PlatformMetrics</i> sin bloque <i>services.triage_model</i> (detectado al ver el fallback en dashboard).",
+            "<b>Tareas en ambito humano</b>: arquitectura global, thresholds clinicos (confianza 0.55, alertas COVID-19), eleccion de stack.",
+            "<b>Impacto en productividad</b>: consolidacion estimada en 5-7 horas efectivas vs. 4-6 dias-persona manualeses (factor ~6-10x). Principal valor: coherencia estilistica uniforme entre backend, dashboard y pipeline.",
         ]),
-        subsection("Prompt 6 — Generacion de la memoria tecnica"),
-        code(
-            "Herramienta: Claude Code\n"
-            "Fase: Documentacion\n\n"
-            "Prompt:\n"
-            "  Quiero que hagas la memoria del proyecto. Haz TODA LA MEMORIA menos\n"
-            "  la parte de los prompts de la IA, esa dejala en TODO. Quiero un\n"
-            "  informe completo, dimeel indice que propones y te digo. Luego\n"
-            "  hazlo en PDF, que se vea profesional y bien cuidado."
-        ),
-        bullets([
-            "<b>Resultado</b>: la IA propuso un indice de 16 capitulos + 3 anexos, lo valido con el equipo y genero un script Python con reportlab que produce un PDF de 43 paginas con portada, cabeceras, tablas, bloques de codigo y paleta de colores corporativa. Incorporo las metricas reales del CNN (leidas de <i>models/radiology_cnn_metrics.json</i>) y del Random Forest.",
-            "<b>Valoracion</b>: acierto con una iteracion. La primera version incluia metricas del CNN como TODO (la IA no sabia que el modelo ya estaba entrenado); tras indicar que el compañero lo habia entrenado y subido, la IA leyo el JSON de metricas y completo la seccion.",
-            "<b>Aprendizaje</b>: la IA no conoce el estado real del repositorio a menos que lo explore activamente; conviene indicar explicitamente que artefactos ya existen antes de pedir documentacion.",
-        ]),
-        section("13.3", "Casos donde la IA acerto"),
-        bullets([
-            "<b>Auditoria inicial del repositorio</b>: identificacion precisa de puntos debiles (monolito en un solo archivo, ausencia de tests, baseline disfrazado de modelo entrenado).",
-            "<b>Diseno transaccional</b>: propuesta espontanea del patron Unit of Work al detectar inconsistencia entre operaciones de escritura separadas en distintas conexiones.",
-            "<b>Carga perezosa y thread-safe del Random Forest</b>: singleton con <i>threading.Lock</i> que carga <i>triage_model.joblib</i> bajo demanda y respeta la concurrencia de FastAPI sin requerir estado global mutable.",
-            "<b>Dobles de tests que respetan contratos reales</b>: rechazo explicito de MagicMock generico en favor de fakes que implementan la interfaz.",
-            "<b>Coherencia estilistica entre modulos</b>: aplicacion uniforme de patrones (config tipada, logging JSON, app factory) en backend, dashboard y pipeline.",
-            "<b>Deteccion de contradicciones documentales</b>: identificacion de inconsistencias entre README y memoria que un revisor exigente habria penalizado.",
-        ]),
-        section("13.4", "Casos donde hubo que corregir o iterar"),
-        bullets([
-            "<b>Tests iniciales con asunciones incorrectas</b>: en la primera generacion, tres tests fallaron por suposiciones de la IA sobre el comportamiento del codigo. Se reescribieron los tests para reflejar el comportamiento real, no el esperado, sin modificar la logica de produccion.",
-            "<b>Sobre-ingenieria espontanea</b>: la IA tendia a introducir middlewares, decoradores o abstracciones no justificadas. Cada propuesta de este tipo se rechazo y se exigio simplicidad.",
-            "<b>Friccion entre response_model y dict literal</b>: una primera version de schemas Pydantic con alias <i>class</i> generaba conflictos al wirearlos como response_model. Se opto por aplicar response_model selectivamente.",
-            "<b>Schemas Pydantic desalineados con la respuesta real</b>: una primera version del schema <i>PlatformMetrics</i> no incluia el bloque <i>services.triage_model</i>, lo que provocaba que el dashboard cayese a la rama de fallback. Se detecto al ver el dashboard mostrar <i>Triaje IA: fallback heuristico</i> con el modelo cargado.",
-            "<b>Templates obsoletos tras migracion a blueprints</b>: la IA detecto referencias a <i>url_for('logout')</i> en lugar de <i>url_for('auth.logout')</i> y propuso corregir los templates antes que retroceder.",
-        ]),
-        section("13.5", "Reflexion critica sobre el uso de IA"),
-        p(
-            "El uso de IA ha tenido un impacto sustancial en velocidad de implementacion y "
-            "calidad estilistica del codigo, pero <b>determinadas tareas se mantuvieron "
-            "deliberadamente en el ambito humano</b>:"
-        ),
-        bullets([
-            "<b>Definicion de la arquitectura global</b>: la eleccion de capas, patrones y separacion de responsabilidades respondio a requisitos reales del enunciado, no se delego.",
-            "<b>Criterios clinicos de alertas</b>: los thresholds (confianza &lt; 0.55, deteccion COVID-19, banderas de calidad) son decisiones humanas con justificacion clinica.",
-            "<b>Validacion clinica</b>: ningun modelo se considera apto para uso real sin revision medica.",
-            "<b>Eleccion de stack tecnologico</b>: la decision PostgreSQL + MinIO + Spark fue del equipo; la IA documento los pros y contras.",
-        ]),
-        p(
-            "<b>Riesgos detectados</b>: la IA tiende a la sobre-ingenieria sin control "
-            "humano. Tambien puede ocultar errores sutiles si no se acompana de tests. En "
-            "este proyecto los tests han funcionado como red de seguridad y han detectado "
-            "varios fallos en la primera ejecucion."
-        ),
-        section("13.6", "Estimacion del impacto en productividad"),
-        p(
-            "El trabajo de consolidacion del proyecto (refactor a arquitectura en capas, "
-            "creacion de la suite de tests, integracion del modelo de triaje, configuracion "
-            "de CI y redaccion documental) se ha realizado en aproximadamente "
-            "<b>5-7 horas efectivas</b> de trabajo asistido por IA. Una estimacion "
-            "conservadora del mismo trabajo manual (incluyendo investigacion de mejores "
-            "practicas, escritura de tests y depuracion de la integracion entre servicios) "
-            "se situaria entre 4 y 6 dias-persona. El factor de aceleracion estimado es del "
-            "orden de <b>6 a 10x</b>."
-        ),
-        p(
-            "Mas alla del ahorro de tiempo, el principal valor anadido fue la "
-            "<b>coherencia estilistica entre modulos</b>: aplicar el mismo patron "
-            "(config tipada, logging JSON, app factory, fakes con contrato) en backend, "
-            "dashboard y pipeline habria sido tedioso manualmente y propenso a divergencias."
-        ),
         PageBreak(),
     ]
     return out
@@ -1513,45 +957,28 @@ def build_ch14_reflection() -> list:
         chapter(14, "Reflexion critica"),
         section("14.1", "Limitaciones del sistema actual"),
         bullets([
-            "<b>CNN entrenado con dataset publico</b>: el ResNet18 alcanza 93.94 % de accuracy sobre test, pero el dataset proviene de fuentes publicas (no del propio hospital) y solo se han ejecutado 5 epochs; no constituye un modelo validado clinicamente.",
-            "<b>Dataset radiografico no incluido</b>: el repositorio no contiene imagenes; se requiere descarga externa para entrenamiento (COVID-19 Radiography Database u otro).",
-            "<b>Triaje con dataset sintetico</b>: el modelo se entrena sobre datos generados por reglas; un despliegue real requiere reentrenamiento con datos hospitalarios anonimizados.",
-            "<b>Autenticacion local</b>: usuario/contrasena con hashes Werkzeug; sin integracion con SSO/LDAP/OIDC corporativo.",
-            "<b>Sin HTTPS</b>: el prototipo expone HTTP plano; un despliegue real requiere reverse proxy con certificado de CA reconocida.",
-            "<b>Sin cifrado en reposo</b>: PostgreSQL y MinIO operan sin encriptacion de disco ni de objetos.",
-            "<b>Sin auditoria detallada</b>: se registran eventos de calidad pero no acciones individuales de usuarios.",
-            "<b>Sin scheduler</b>: el pipeline se ejecuta on-demand; no hay disparo automatico ante nuevos ficheros.",
-            "<b>Sin alta disponibilidad</b>: una sola instancia de cada servicio; no hay replicacion ni failover.",
-            "<b>Solo procesamiento batch</b>: el pipeline procesa lotes; no hay ingesta streaming.",
+            "<b>CNN con dataset publico (5 epochs)</b>: accuracy 93.94 % sobre test, pero no constituye modelo validado clinicamente; requiere datos hospitalarios reales.",
+            "<b>Dataset radiografico no incluido</b>: se requiere descarga externa (COVID-19 Radiography Database u otro) para reentrenar.",
+            "<b>Triaje sintetico</b>: entrenado con datos generados por reglas MEWS/NEWS2; despliegue real exige reentrenamiento con datos anonimizados hospitalarios.",
+            "<b>Sin HTTPS ni cifrado en reposo</b>: HTTP plano; PostgreSQL y MinIO sin encriptacion de disco/objetos.",
+            "<b>Sin scheduler ni HA</b>: pipeline on-demand, una sola instancia de cada servicio, sin failover.",
         ]),
         section("14.2", "Posibles mejoras"),
         bullets([
-            "<b>Reentrenar el CNN con mas epochs y data augmentation extendida</b>: introducir scheduling del learning rate, mixup/cutmix y validacion cruzada para reducir la fluctuacion observada en la curva de validacion.",
-            "<b>Caching de inferencia</b>: deduplicacion por checksum de imagen para evitar reprocesar la misma radiografia.",
-            "<b>SSO corporativo</b>: migrar la autenticacion local a OAuth2 / OIDC con Keycloak o proveedor cloud.",
-            "<b>Cifrado SSE-S3 en MinIO</b> con clave gestionada externamente (KMS).",
-            "<b>Scheduler de pipeline</b>: Airflow o Prefect para disparar ingesta ante nuevos ficheros o por cron.",
-            "<b>Trazabilidad distribuida</b>: OpenTelemetry para seguir una peticion entre dashboard, backend y pipeline.",
-            "<b>Observabilidad externa</b>: el backend ya expone un snapshot agregado en <i>/metrics</i> consumido por el dashboard; un despliegue real anadiria un stack de metricas (Prometheus + Grafana, OpenTelemetry o equivalente) y agregacion de logs (ELK, Loki).",
-            "<b>Tests de integracion end-to-end</b>: docker-compose dedicado a tests que levante PostgreSQL y MinIO efimeros antes de pytest.",
-            "<b>Auditoria de seguridad OWASP ASVS</b>: rate limiting en /predict y /triage, validacion de Content-Length antes de leer cuerpo, revision de headers de seguridad.",
-            "<b>Mejora de la clase <i>high</i> del triaje</b>: el recall 0.58 sugiere que las fronteras entre medium y high requieren reentrenamiento con datos reales y reajuste de los thresholds del MEWS/NEWS2 utilizados como base de etiquetado.",
-            "<b>Internacionalizacion del dashboard</b>: actualmente solo en castellano; preparar i18n para catalan e ingles.",
+            "<b>Reentrenar CNN</b>: mas epochs, scheduling de lr, mixup/cutmix y validacion cruzada.",
+            "<b>SSO corporativo</b>: OAuth2 / OIDC con Keycloak o proveedor cloud.",
+            "<b>Cifrado SSE-S3 en MinIO</b> con KMS; disco cifrado (LUKS) para PostgreSQL.",
+            "<b>Scheduler de pipeline</b>: Airflow o Prefect para ingesta automatica ante nuevos ficheros.",
+            "<b>Observabilidad externa</b>: stack Prometheus + Grafana o OpenTelemetry sobre el endpoint <i>/metrics</i> ya disponible.",
+            "<b>Mejora clase <i>high</i> del triaje</b>: recall 0.58; reentrenamiento con datos reales y ajuste de thresholds MEWS/NEWS2.",
         ]),
-        section("14.3", "Viabilidad de aplicacion en un entorno real"),
-        p(
-            "Para llevar el sistema a produccion en un hospital real seria necesario, "
-            "ademas de las mejoras tecnicas anteriores:"
-        ),
+        section("14.3", "Viabilidad en produccion real"),
         bullets([
-            "<b>Validacion clinica del modelo CNN</b> por un equipo medico con dataset representativo.",
-            "<b>Certificacion como producto sanitario</b>: clasificacion CE bajo el Reglamento (UE) 2017/745 (MDR) o equivalente FDA segun jurisdiccion. Probablemente clase IIa.",
-            "<b>Auditoria de seguridad y privacidad</b> conforme al GDPR (Reglamento (UE) 2016/679) y normativa espanola de proteccion de datos sanitarios.",
-            "<b>Acuerdo de tratamiento de datos</b> firmado con cualquier proveedor cloud que aloje datos clinicos.",
-            "<b>Plan de respuesta ante incidentes</b> con notificacion en menos de 72 horas a la AEPD.",
-            "<b>Plan de continuidad de negocio</b>: backups cifrados, plan de recuperacion ante desastres, replicacion en region secundaria.",
-            "<b>Procedimientos operativos</b>: documentacion de altas/bajas de usuarios, gestion de claves, rotacion de contrasenas, revisiones periodicas de acceso.",
-            "<b>Formacion del personal sanitario</b>: el sistema es una herramienta de apoyo, no un sustituto del criterio clinico.",
+            "<b>Validacion clinica CNN</b> por equipo medico con dataset representativo del hospital.",
+            "<b>Certificacion MDR</b>: clasificacion CE bajo Reglamento (UE) 2017/745, probablemente clase IIa.",
+            "<b>Auditoria GDPR</b> y normativa espanola de proteccion de datos sanitarios.",
+            "<b>Plan de incidentes</b>: notificacion a la AEPD en menos de 72 horas ante cualquier brecha.",
+            "<b>Formacion del personal</b>: el sistema es herramienta de apoyo, no sustituto del criterio clinico.",
         ]),
         PageBreak(),
     ]
@@ -1563,100 +990,44 @@ def build_ch15_ethics() -> list:
         chapter(15, "Consideraciones eticas y legales"),
         section("15.1", "Sesgos en datos y modelos"),
         p(
-            "Los modelos de clasificacion de imagenes medicas son particularmente "
-            "vulnerables a sesgos cuando el conjunto de entrenamiento no representa la "
-            "diversidad clinica real de la poblacion objetivo. Un modelo entrenado "
-            "exclusivamente con radiografias procedentes de un unico hospital, un unico "
-            "modelo de equipo radiologico o un rango demografico estrecho puede exhibir un "
-            "rendimiento significativamente inferior cuando se aplica fuera de ese contexto."
+            "Los modelos de imagen medica son vulnerables a sesgos cuando el dataset "
+            "no representa la diversidad clinica real. Riesgos identificados: sesgo de "
+            "procedencia (un solo hospital), sesgo demografico, sesgo de equipo radiologico "
+            "(el modelo aprende la marca del scanner, no la patologia), sesgo temporal y "
+            "sesgo de etiquetado (un solo radiologo sin doble lectura)."
         ),
-        subsection("Riesgos especificos identificados"),
         bullets([
-            "<b>Sesgo de procedencia</b>: dataset dominado por un solo hospital, pais o region.",
-            "<b>Sesgo demografico</b>: distribucion no equilibrada por edad, sexo, etnia o nivel socioeconomico.",
-            "<b>Sesgo de equipo radiologico</b>: imagenes capturadas con un fabricante o modelo concreto pueden enganar al modelo (aprende a clasificar por la marca de agua o caracteristicas del equipo, no por la patologia).",
-            "<b>Sesgo temporal</b>: predominancia de imagenes de un periodo concreto (por ejemplo, primera ola de COVID-19) con caracteristicas tecnicas distintas a periodos posteriores.",
-            "<b>Sesgo de etiquetado</b>: clasificaciones realizadas por un solo radiologo, sin doble lectura ni consenso clinico.",
-        ]),
-        subsection("Medidas propuestas"),
-        bullets([
-            "<b>Transparencia del dataset</b>: documentar publicamente la composicion (origen, equipos, periodos, demografia).",
-            "<b>Particion por paciente</b>: separar train/val/test por paciente y no por imagen, para evitar fuga entre conjuntos.",
-            "<b>Metricas estratificadas</b>: calcular precision, recall y F1 por subgrupo demografico y reportar la peor metrica como referencia.",
-            "<b>Auditoria de la matriz de confusion</b>: especial atencion a falsos negativos en patologias contagiosas.",
+            "<b>Particion por paciente</b>: separar train/val/test por paciente para evitar fuga entre conjuntos.",
+            "<b>Metricas estratificadas</b>: precision/recall/F1 por subgrupo demografico; reportar la peor como referencia.",
             "<b>Monitorizacion continua</b>: revisiones periodicas del rendimiento en produccion con muestras representativas.",
         ]),
         section("15.2", "Riesgos en la decision automatizada"),
         p(
             "El sistema <b>no esta autorizado a tomar decisiones clinicas autonomas</b>. "
-            "Su rol es de apoyo: ofrecer una clasificacion preliminar, marcar casos para "
-            "revision prioritaria y reducir carga administrativa. La responsabilidad final "
-            "del diagnostico recae siempre en el personal sanitario."
+            "La responsabilidad final recae siempre en el personal sanitario."
         ),
-        subsection("Riesgos clinicos especificos"),
         bullets([
-            "<b>Falso negativo de COVID-19</b>: retraso en aislamiento, aumento del riesgo de contagio intrahospitalario. Es el error de mayor gravedad y debe ser objetivo explicito de minimizacion.",
-            "<b>Falso negativo de neumonia</b>: retraso del tratamiento antibiotico y posible progresion clinica.",
-            "<b>Falso positivo</b>: ansiedad del paciente, pruebas confirmatorias innecesarias, sobrecarga del circuito de revision.",
-            "<b>Automation bias</b>: tendencia humana a confiar mas en una recomendacion automatica de lo que la evidencia justifica.",
-            "<b>Falso negativo en triaje critico</b>: paciente grave clasificado como menor riesgo; mitigado por el alto recall (0.92) en la clase <i>critical</i> y por la revision humana obligatoria.",
+            "<b>Falso negativo COVID-19</b>: retraso en aislamiento; mitigado con recall 0.983 y alerta automatica de severidad alta.",
+            "<b>Falso negativo triaje critico</b>: mitigado con recall 0.92 en clase <i>critical</i> y revision humana obligatoria.",
+            "<b>Automation bias</b>: cada prediccion incluye nota explicita '<i>resultado de apoyo, no diagnostico</i>'.",
+            "<b>Baja confianza</b>: predicciones con confianza &lt; 0.55 generan evento automatico de revision.",
         ]),
-        subsection("Mitigaciones implementadas"),
-        bullets([
-            "Cada prediccion se acompana de una <b>nota clinica</b> explicita: <i>resultado de apoyo, no diagnostico</i>.",
-            "Las predicciones con <b>confianza inferior a 0.55</b> generan un evento de baja confianza automaticamente.",
-            "Toda prediccion <b>COVID-19</b> genera una alerta de severidad alta independientemente de la confianza.",
-            "Las banderas de calidad de imagen (oscuridad, sobrexposicion, bajo contraste) se reportan al usuario para permitir repetir el estudio.",
-            "El <b>historico completo</b> de estudios y triajes queda persistido para auditoria a posteriori.",
-        ]),
-        section("15.3", "Privacidad y proteccion de datos (RGPD)"),
+        section("15.3", "Privacidad (RGPD) y limitaciones legales"),
         p(
-            "Las imagenes medicas y los datos clinicos son <b>categorias especiales de "
-            "datos personales</b> segun el articulo 9 del RGPD y la normativa espanola de "
-            "proteccion de datos sanitarios. Este prototipo no contiene mecanismos "
-            "suficientes para tratar datos reales de pacientes y debe usarse "
-            "<b>exclusivamente con datos anonimizados, sinteticos o simulados</b>."
+            "Las imagenes y datos clinicos son <b>categorias especiales de datos personales</b> "
+            "(Art. 9 RGPD). Este prototipo debe usarse <b>exclusivamente con datos "
+            "anonimizados, sinteticos o simulados</b>. Carencias actuales: sin cifrado en "
+            "reposo, sin auditoria de accesos individuales, sin gestion de consentimientos, "
+            "sin derecho al olvido automatizado. En un entorno real seria obligatorio: RBAC, "
+            "TLS en todos los flujos, cifrado SSE-S3/KMS, auditoria exportable, politica de "
+            "retencion y acuerdo de tratamiento con proveedores cloud."
         ),
-        subsection("Carencias actuales del prototipo"),
-        bullets([
-            "No hay cifrado en reposo de los objetos en MinIO ni de las filas en PostgreSQL.",
-            "No hay auditoria detallada de accesos individuales por usuario.",
-            "No hay gestion de consentimientos del paciente.",
-            "Las copias de seguridad no estan automatizadas ni cifradas.",
-            "No hay procedimiento documentado de borrado a peticion del interesado (derecho al olvido).",
-        ]),
-        subsection("Medidas necesarias en un entorno real"),
-        bullets([
-            "<b>Control de acceso por roles (RBAC)</b> con principio de minimo privilegio.",
-            "<b>Cifrado en reposo</b>: PostgreSQL con disco cifrado (LUKS, BitLocker), MinIO con SSE-S3 o SSE-KMS.",
-            "<b>Cifrado en transito</b>: TLS obligatorio en todos los flujos, incluyendo conexiones internas entre servicios.",
-            "<b>Registro de auditoria</b>: cada acceso a un estudio queda registrado y es exportable para inspeccion.",
-            "<b>Politica de retencion</b>: borrado seguro automatico al expirar el periodo legal de conservacion.",
-            "<b>Minimizacion de datos</b>: almacenar solo lo estrictamente necesario para el proceso clinico.",
-            "<b>Anonimizacion</b>: identificadores irreversiblemente anonimizados cuando se exporten datos para investigacion.",
-            "<b>Acuerdo de tratamiento</b>: firma con cualquier proveedor cloud que aloje datos.",
-            "<b>Plan de respuesta ante incidentes</b>: notificacion en menos de 72 horas a la AEPD ante cualquier brecha.",
-        ]),
-        section("15.4", "Responsabilidad clinica"),
         p(
-            "La interpretacion final de cualquier estudio o triaje corresponde al personal "
-            "sanitario. El sistema debe mostrar de forma visible explicaciones, niveles de "
-            "incertidumbre, banderas de calidad y notas clinicas para evitar que los "
-            "usuarios confundan una prediccion con un diagnostico definitivo. La "
-            "trazabilidad se apoya en el registro completo de estudios y eventos en "
-            "PostgreSQL y los informes JSON persistentes en MinIO."
-        ),
-        section("15.5", "Limitaciones legales del prototipo"),
-        p(
-            "El sistema descrito en esta memoria es un <b>prototipo academico</b>. El CNN "
-            "ResNet18 alcanza un 93.94 % de accuracy sobre el conjunto de test publico, pero "
-            "no constituye un modelo validado clinicamente: requiere validacion externa con "
-            "datos hospitalarios reales, evaluacion formal por un equipo medico y, en su "
-            "caso, certificacion regulatoria como producto sanitario antes de cualquier uso "
-            "clinico real. "
-            "El triaje opera con un modelo entrenado sobre datos sinteticos inspirados en "
-            "MEWS/NEWS2; un despliegue real requiere reentrenamiento con datos "
-            "hospitalarios y validacion frente a los protocolos vigentes."
+            "El CNN ResNet18 (accuracy 93.94 % sobre test publico) no constituye un modelo "
+            "validado clinicamente: requiere validacion externa, evaluacion medica formal y "
+            "certificacion MDR (Reglamento (UE) 2017/745, probablemente clase IIa) antes de "
+            "cualquier uso real. El triaje con dataset sintetico exige reentrenamiento con "
+            "datos hospitalarios y validacion frente a protocolos MEWS/NEWS2 vigentes."
         ),
         PageBreak(),
     ]
@@ -1674,30 +1045,7 @@ def build_ch16_conclusions() -> list:
             "estructurado, dashboard con autenticacion, automatizaciones de alertas y "
             "calidad, y documentacion profesional acompanada de tests automatizados."
         ),
-        section("16.1", "Cumplimiento del enunciado"),
-        table(
-            ["Requisito del enunciado", "Estado"],
-            [
-                ["Modelo de IA justificado", "<b>Cumplido</b> (RF triaje + CNN ResNet18)"],
-                ["Procesamiento Big Data con framework distribuido", "<b>Cumplido</b> (Spark)"],
-                ["Dos tipos de almacenamiento combinados", "<b>Cumplido</b> (PostgreSQL + MinIO)"],
-                ["Pipeline ingesta / limpieza / transformacion / analisis", "<b>Cumplido</b>"],
-                ["Automatizacion de procesos", "<b>Cumplido</b> (alertas, informes, bucket)"],
-                ["Visualizacion y comunicacion (dashboard)", "<b>Cumplido</b> (Flask con auth)"],
-                ["Containerizacion con docker-compose", "<b>Cumplido</b> (1 solo comando)"],
-                ["Calidad de datos y logging", "<b>Cumplido</b>"],
-                ["Vibe Coding con herramienta IA", "<b>Cumplido</b> (Claude Code + Codex)"],
-                ["Metodologia SDD", "<b>Cumplido</b> (docs/SDD.md)"],
-                ["Clasificacion triple radiografias", "<b>Cumplido</b> (Sana / Neumonia / COVID-19)"],
-                ["Matriz de confusion analizada", "<b>Cumplido</b> (triaje y CNN sobre val y test)"],
-                ["Reflexion clinica del modelo", "<b>Cumplido</b>"],
-                ["Consideraciones eticas y legales", "<b>Cumplido</b>"],
-                ["Memoria tecnica con apartados obligatorios", "<b>Cumplido</b> (este documento)"],
-                ["Diario de desarrollo con IA", "<b>Parcial</b> (prompts pendientes)"],
-            ],
-            col_widths=[10.5 * cm, 6.0 * cm],
-        ),
-        section("16.2", "Valor aportado"),
+        section("16.1", "Valor aportado"),
         p(
             "Mas alla del cumplimiento estricto del enunciado, el proyecto aporta valor en "
             "tres dimensiones:"
@@ -1805,120 +1153,6 @@ def build_annex_a() -> list:
     return out
 
 
-def build_annex_b() -> list:
-    out: list = [
-        chapter(0, "Anexo B. Variables de entorno"),
-        p(
-            "Las variables se cargan desde el archivo <i>.env</i>, que se construye a "
-            "partir de <i>.env.example</i>. El archivo <i>.env</i> nunca se sube al "
-            "repositorio."
-        ),
-        subsection("PostgreSQL"),
-        code(
-            "POSTGRES_USER=hospital_user\n"
-            "POSTGRES_PASSWORD=<password fuerte>\n"
-            "POSTGRES_DB=hospital_db\n"
-        ),
-        subsection("MinIO"),
-        code(
-            "MINIO_ROOT_USER=hospital_minio_admin\n"
-            "MINIO_ROOT_PASSWORD=<password fuerte>\n"
-            "MINIO_REGION=us-east-1\n"
-            "MINIO_BUCKET_NAME=hospital-data\n"
-            "MINIO_AUTO_CREATE_BUCKET=true\n"
-            "MINIO_CONSOLE_URL=http://localhost:9001\n"
-        ),
-        subsection("Autenticacion del dashboard"),
-        code(
-            "SECRET_KEY=<clave aleatoria de al menos 32 bytes>\n"
-            "SESSION_COOKIE_SECURE=false\n"
-            "ADMIN_USERNAME=admin\n"
-            "ADMIN_PASSWORD_HASH=<hash Werkzeug PBKDF2-SHA256>\n"
-            "USER_USERNAME=doctor\n"
-            "USER_PASSWORD_HASH=<hash Werkzeug PBKDF2-SHA256>\n"
-        ),
-        subsection("Pipeline"),
-        code(
-            "PIPELINE_INPUT_PATH=/data/incoming/radiology_studies.csv\n"
-            "PIPELINE_OUTPUT_PATH=/data/processed/radiology_clean\n"
-        ),
-        subsection("Entrenamiento CNN"),
-        code(
-            "TRAINING_EPOCHS=5\n"
-            "TRAINING_BATCH_SIZE=16\n"
-            "TRAINING_LEARNING_RATE=0.0005\n"
-            "TRAINING_PRETRAINED=false\n"
-        ),
-        subsection("Entrenamiento triaje"),
-        code(
-            "TRIAGE_SAMPLES=8000\n"
-            "TRIAGE_N_ESTIMATORS=400\n"
-            "TRIAGE_MAX_DEPTH=12\n"
-            "TRIAGE_NOISE_RATE=0.06\n"
-            "TRIAGE_RANDOM_STATE=42\n"
-        ),
-        PageBreak(),
-    ]
-    return out
-
-
-def build_annex_c() -> list:
-    out: list = [
-        chapter(0, "Anexo C. Comandos de ejecucion"),
-        subsection("Arranque basico"),
-        code(
-            "cp .env.example .env             # Copiar variables\n"
-            "# Editar .env con credenciales reales\n"
-            "docker compose up -d              # Levantar entorno\n"
-            "docker compose ps                 # Ver estado\n"
-            "docker compose logs -f            # Seguir logs\n"
-            "docker compose down               # Parar entorno\n"
-            "docker compose down -v            # Parar y borrar volumenes\n"
-        ),
-        subsection("Ejecutar el pipeline Big Data"),
-        code(
-            "docker compose --profile pipeline up --build pipeline\n"
-        ),
-        subsection("Entrenar el modelo CNN de radiografias"),
-        code(
-            "# Requiere dataset en data/radiology_dataset/{train,val}/{Sana,Neumonia,COVID-19}/\n"
-            "docker compose --profile training run --rm model-trainer\n"
-        ),
-        subsection("Entrenar el modelo de triaje"),
-        code(
-            "docker compose --profile triage-training run --rm triage-trainer\n"
-        ),
-        subsection("Ejecucion de tests locales"),
-        code(
-            "# Backend\n"
-            "cd backend\n"
-            "pip install -r requirements-dev.txt\n"
-            "pytest --cov=app --cov-report=term\n"
-            "\n"
-            "# Dashboard\n"
-            "cd ../dashboard\n"
-            "pip install -r requirements-dev.txt\n"
-            "pytest --cov=app --cov-report=term\n"
-        ),
-        subsection("Pruebas rapidas de API"),
-        code(
-            "# Salud del backend\n"
-            "curl http://localhost:8000/health\n"
-            "\n"
-            "# Triaje desde PowerShell\n"
-            'Invoke-RestMethod -Method Post -Uri "http://localhost:8000/triage" `\n'
-            '  -ContentType "application/json" `\n'
-            "  -Body \\'{\"symptoms\":[\"fever\",\"shortness of breath\"],\"vitals\":{\"heart_rate\":125,\"oxygen_saturation\":90,\"systolic_bp\":95}}\\'\n"
-            "\n"
-            "# Interfaces web\n"
-            "# http://localhost:8501       Dashboard\n"
-            "# http://localhost:8000/docs  Swagger UI\n"
-            "# http://localhost:9001       Consola MinIO\n"
-        ),
-    ]
-    return out
-
-
 def flatten(items: list) -> list:
     out: list = []
     for item in items:
@@ -1953,8 +1187,6 @@ def main() -> None:
     story += build_ch15_ethics()
     story += build_ch16_conclusions()
     story += build_annex_a()
-    story += build_annex_b()
-    story += build_annex_c()
 
     doc.build(flatten(story))
     print(f"PDF generado en: {OUTPUT_PATH}")
