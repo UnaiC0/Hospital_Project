@@ -38,8 +38,21 @@ class QualityMetrics(BaseModel):
     open_events_by_severity: dict[str, int]
 
 
+class TriageModelStatus(BaseModel):
+    loaded: bool
+    model_name: str | None = None
+    model_version: str | None = None
+    path: str | None = None
+    reason: str | None = None
+
+
+class ServicesStatus(BaseModel):
+    triage_model: TriageModelStatus
+
+
 class PlatformMetrics(BaseModel):
     radiology: RadiologyMetrics
     triage: TriageMetrics
     pipeline: PipelineMetrics
     quality: QualityMetrics
+    services: ServicesStatus

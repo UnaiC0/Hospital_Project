@@ -5,10 +5,10 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from app.core.metrics import TRIAGE_ASSESSMENTS_TOTAL
 from app.db.session import DatabaseSession
 from app.repositories import triage_repository
 from app.schemas.triage import TriageRequest
+from app.services import triage_model
 from app.storage.object_storage import ObjectStorage
 
 
@@ -22,6 +22,11 @@ class TriageService:
         self._storage = object_storage
 
     def assess(self, request: TriageRequest) -> dict[str, Any]:
+        model_result = triage_model.predict(request.symptoms, request.vitals)
+        assessment = model_result if model_result is not None else self._baseline(request)
+        return assessment
+
+    def _baseline(self, request: TriageRequest) -> dict[str, Any]:
         symptoms = {symptom.strip().lower() for symptom in request.symptoms if symptom}
         heart_rate = self._coerce_float(request.vitals.get("heart_rate"), 0.0)
         oxygen_saturation = self._coerce_float(request.vitals.get("oxygen_saturation"), 100.0)
@@ -47,9 +52,8 @@ class TriageService:
         else:
             risk_level, recommended_priority = "low", "standard"
 
-        TRIAGE_ASSESSMENTS_TOTAL.labels(risk_level=risk_level).inc()
         return {
-            "model_name": "hospital-triage-embedded",
+            "model_name": "hospital-triage-rules-fallback",
             "risk_level": risk_level,
             "recommended_priority": recommended_priority,
             "confidence": round(min(0.99, 0.65 + (score / 200)), 2),

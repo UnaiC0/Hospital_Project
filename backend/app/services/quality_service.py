@@ -6,7 +6,6 @@ from uuid import uuid4
 
 import psycopg
 
-from app.core.metrics import QUALITY_EVENTS_RECORDED_TOTAL
 from app.db.session import DatabaseSession
 from app.repositories import quality_repository
 
@@ -44,7 +43,6 @@ class QualityService:
             message=message,
             metadata=metadata or {},
         )
-        QUALITY_EVENTS_RECORDED_TOTAL.labels(severity=severity).inc()
         return {
             "event_id": event_id,
             "created_at": created_at.isoformat(),

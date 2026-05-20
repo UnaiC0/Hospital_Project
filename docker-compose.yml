@@ -28,6 +28,8 @@ services:
       SPARK_MASTER_URL: spark://spark:7077
       MODEL_DIR: /models
       RADIOLOGY_MODEL_FILE: ${RADIOLOGY_MODEL_FILE:-radiology_cnn_resnet18.pt}
+      TRIAGE_MODEL_PATH: /models/triage_model.joblib
+      TRIAGE_LOW_CONFIDENCE: ${TRIAGE_LOW_CONFIDENCE:-0.55}
     volumes:
       - ./models:/models:ro
     depends_on:
@@ -37,14 +39,6 @@ services:
         condition: service_healthy
       spark:
         condition: service_started
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`hospital.local`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls=true"
-      - "traefik.http.routers.backend.middlewares=backend-strip"
-      - "traefik.http.middlewares.backend-strip.stripprefix.prefixes=/api"
-      - "traefik.http.services.backend.loadbalancer.server.port=8000"
     networks:
       - hospital_network
 
@@ -233,68 +227,6 @@ services:
       MINIO_BUCKET_NAME: "${MINIO_BUCKET_NAME:?Set MINIO_BUCKET_NAME in .env}"
       MINIO_REGION: ${MINIO_REGION:-us-east-1}
       MINIO_CONSOLE_URL: ${MINIO_CONSOLE_URL:-http://localhost:9001}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`hospital.local`)"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.tls=true"
-      - "traefik.http.services.dashboard.loadbalancer.server.port=8501"
-    networks:
-      - hospital_network
-
-  traefik:
-    image: traefik:v3.1
-    container_name: hospital-traefik
-    restart: always
-    profiles:
-      - tls
-    command:
-      - --configFile=/etc/traefik/traefik.yml
-    ports:
-      - "127.0.0.1:80:80"
-      - "127.0.0.1:443:443"
-      - "127.0.0.1:8088:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./infrastructure/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./infrastructure/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
-      - ./infrastructure/traefik/certs:/certs:ro
-    networks:
-      - hospital_network
-
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    container_name: hospital-prometheus
-    restart: always
-    ports:
-      - "127.0.0.1:9090:9090"
-    volumes:
-      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - hospital_network
-
-  grafana:
-    image: grafana/grafana:11.2.0
-    container_name: hospital-grafana
-    restart: always
-    ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_AUTH_ANONYMOUS_ENABLED: "false"
-    volumes:
-      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      prometheus:
-        condition: service_started
     networks:
       - hospital_network
 
@@ -306,5 +238,3 @@ networks:
 volumes:
   postgres_data:
   minio_data:
-  prometheus_data:
-  grafana_data:

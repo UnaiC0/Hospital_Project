@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from app.core.metrics import RADIOLOGY_PREDICTIONS_TOTAL
 from app.db.session import DatabaseSession
 from app.repositories import radiology_repository
 from app.services.inference_service import InferenceService
@@ -48,7 +47,6 @@ class RadiologyService:
         source_object_key: str | None,
     ) -> dict[str, Any]:
         prediction = self._inference.predict(image_bytes)
-        RADIOLOGY_PREDICTIONS_TOTAL.labels(class_label=str(prediction.get("class", "unknown"))).inc()
 
         study_id = str(uuid4())
         created_at = datetime.now(timezone.utc)
