@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import torch
 import pytest
+from torch import nn
 
 from app.services.inference_service import InferenceService
 from tests.helpers.images import (
@@ -11,11 +13,29 @@ from tests.helpers.images import (
 )
 
 VALID_CLASSES = {"Sana", "Neumonia", "COVID-19"}
+_CLASS_NAMES = ["Sana", "Neumonia", "COVID-19"]
+
+
+class _FakeModel(nn.Module):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.tensor([[0.7, 0.2, 0.1]] * x.shape[0])
 
 
 @pytest.fixture
 def service() -> InferenceService:
-    return InferenceService()
+    preprocessing = {
+        "size": [224, 224],
+        "normalization_mean": [0.485, 0.456, 0.406],
+        "normalization_std": [0.229, 0.224, 0.225],
+    }
+    return InferenceService(
+        model=_FakeModel(),
+        class_names=_CLASS_NAMES,
+        preprocessing=preprocessing,
+        model_name="test-model",
+        model_version="0.0.0",
+        device=torch.device("cpu"),
+    )
 
 
 class TestPredictionShape:

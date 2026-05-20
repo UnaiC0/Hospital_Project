@@ -6,10 +6,9 @@ from fastapi import FastAPI
 
 from app.api.deps import get_database_session
 from app.api.errors import register_exception_handlers
-from app.api.routers import health, metrics, prometheus, quality, radiology, triage
+from app.api.routers import health, metrics, quality, radiology, triage
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
-from app.core.metrics import register_metrics_middleware
 from app.db.schema import initialize_schema_with_retry
 
 
@@ -36,14 +35,12 @@ def create_app() -> FastAPI:
             logger.info("shutdown")
 
     app = FastAPI(title="Hospital Backend", version="3.0.0", lifespan=lifespan)
-    register_metrics_middleware(app)
     register_exception_handlers(app)
     app.include_router(health.router)
     app.include_router(triage.router)
     app.include_router(radiology.router)
     app.include_router(quality.router)
     app.include_router(metrics.router)
-    app.include_router(prometheus.router)
     return app
 
 

@@ -4,6 +4,7 @@ from typing import Any
 
 from app.db.session import DatabaseSession
 from app.repositories import metrics_repository, quality_repository
+from app.services import triage_model
 
 
 class MetricsService:
@@ -22,4 +23,5 @@ class MetricsService:
             "triage": {"total_records": triage},
             "pipeline": {"latest_run": latest_pipeline},
             "quality": {"open_events_by_severity": open_events},
+            "services": {"triage_model": triage_model.model_status()},
         }
